@@ -7,8 +7,9 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { LanguageProvider, useTranslation } from "@/lib/i18n";
+import { initClientErrorTracking } from "@/lib/errorTracking";
 
 import appCss from "../styles.css?url";
 
@@ -117,6 +118,10 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    initClientErrorTracking();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import {
   Gauge,
@@ -15,27 +16,33 @@ import { RouteMap } from "@/components/rail/RouteMap";
 import { EtaConfidenceBadge } from "@/components/rail/EtaConfidenceBadge";
 import { DelayReasonTag } from "@/components/rail/DelayReasonTag";
 import { TrainTrackTimeline } from "@/components/rail/TrainTrackTimeline";
+import { EngineEtaBlock } from "@/components/rail/EtaBand";
+import { SourceTierBadge } from "@/components/rail/SourceTierBadge";
 import { useLiveClock } from "@/components/rail/useLiveClock";
 import { useOnBoardGps } from "@/hooks/useOnBoardGps";
-import { getTrain } from "@/data/trains";
+import { useEngineEta } from "@/hooks/useEngineEta";
+import { loadTrainRoute } from "@/data/loadTrainRoute";
 import { computeLiveStatus, delayLabel, delayTone, fmtMinutes } from "@/lib/liveStatus";
 import { useTranslation } from "@/lib/i18n";
 
 export const Route = createFileRoute("/train/$number")({
-  loader: ({ params }) => {
-    const train = getTrain(params.number);
+  loader: async ({ params }) => {
+    const train = await loadTrainRoute(params.number);
     if (!train) throw notFound();
     return { train };
   },
   head: ({ loaderData }) => {
     if (!loaderData) {
       return {
-        meta: [{ title: "Train not found — ITS Indian Train System" }, { name: "robots", content: "noindex" }],
+        meta: [
+          { title: "Train not found — ITS Indian Train System" },
+          { name: "robots", content: "noindex" },
+        ],
       };
     }
     const { train } = loaderData;
     const title = `${train.number} ${train.name} — Live Running Status & Route Track | ITS Indian Train System`;
-    const description = `Live track timeline, GPS location, delay prediction, next halt, and full timetable for ${train.number} ${train.name} between ${train.halts[0]!.name} and ${train.halts[train.halts.length - 1]!.name}.`;
+    const description = `Track timeline, predicted delay, next halt, and full timetable for ${train.number} ${train.name} between ${train.halts[0]!.name} and ${train.halts[train.halts.length - 1]!.name}.`;
     return {
       meta: [
         { title },
@@ -73,12 +80,14 @@ function TrainStatus() {
   const { train } = Route.useLoaderData();
   const { t } = useTranslation();
   const now = useLiveClock(4000);
-  const gps = useOnBoardGps(train);
+  const [gpsConsent, setGpsConsent] = useState(false);
+  const gps = useOnBoardGps(train, { consent: gpsConsent });
+  const dest = train.halts[train.halts.length - 1]!;
+  const { payload: engineEta } = useEngineEta(train.number, dest.code);
 
   // If on-board GPS is active, prioritize real satellite device GPS position!
   const status =
     gps.isActive && gps.gpsStatus ? gps.gpsStatus : now ? computeLiveStatus(train, now) : null;
-  const dest = train.halts[train.halts.length - 1]!;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -191,7 +200,10 @@ function TrainStatus() {
 
               {status?.forecast && (
                 <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-3">
-                  <EtaConfidenceBadge confidence={status.forecast.confidence} />
+                  <EtaConfidenceBadge
+                    confidence={engineEta?.confidence ?? status.forecast.confidence}
+                  />
+                  {engineEta ? <SourceTierBadge source={engineEta.source} /> : null}
                   <span className="text-xs text-muted-foreground">
                     {gps.isActive
                       ? t("train.realTimeLocation")
@@ -204,6 +216,37 @@ function TrainStatus() {
                   </span>
                 </div>
               )}
+              {engineEta ? (
+                <div className="mt-4 rounded-xl border border-border bg-card px-4 py-3">
+                  <EngineEtaBlock payload={engineEta} stationName={dest.code} />
+                </div>
+              ) : null}
+              <label className="mt-4 flex items-start gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  className="mt-1 size-4"
+                  checked={gpsConsent}
+                  data-testid="gps-consent"
+                  onChange={(event) => setGpsConsent(event.target.checked)}
+                />
+                <span>
+                  I consent to sharing anonymous on-board GPS observations to improve arrival
+                  predictions. Location is not uploaded until this box is checked. Coordinates are
+                  stored at ~111 m precision and can be deleted below.
+                </span>
+              </label>
+              <button
+                type="button"
+                data-testid="gps-delete"
+                className="mt-2 text-left text-xs text-muted-foreground underline"
+                onClick={() => {
+                  void fetch(`/api/v2/observations?train=${encodeURIComponent(train.number)}`, {
+                    method: "DELETE",
+                  });
+                }}
+              >
+                Delete stored location data for this train
+              </button>
 
               <div className="relative mt-5 h-1.5 overflow-hidden rounded-full bg-secondary">
                 <div

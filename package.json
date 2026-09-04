@@ -11,7 +11,23 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "ingest": "node scripts/ingest.mjs"
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cov": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "ingest": "node scripts/ingest.mjs",
+    "harvest": "node scripts/harvest.mjs",
+    "train:data": "node scripts/generate-training-data.mjs",
+    "train:model": "python ml/train.py",
+    "train:retrain": "python ml/retrain.py",
+    "model:promote": "node scripts/promote-model.mjs",
+    "model:rollback": "node scripts/rollback-model.mjs",
+    "eval": "node scripts/run-eval.mjs",
+    "bench": "node scripts/bench.mjs",
+    "check:bundle": "node scripts/check-bundle.mjs",
+    "demo:rehearse": "node scripts/rehearse-demo.mjs"
   },
   "overrides": {
     "rolldown": "1.2.1"
@@ -71,21 +87,28 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^9.32.0",
+    "@playwright/test": "^1.62.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.2.0",
+    "@vitest/coverage-v8": "^5.0.0",
     "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.6",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
+    "happy-dom": "^20.13.2",
     "nitro": "3.0.260603-beta",
     "prettier": "^3.7.3",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
-    "vite": "8.1.5"
+    "vite": "8.1.5",
+    "vitest": "^5.0.0"
   }
 }

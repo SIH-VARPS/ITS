@@ -16,7 +16,6 @@ import {
   Building2,
   Activity,
   X,
-  Target,
   Sparkles,
 } from "lucide-react";
 import {
@@ -32,13 +31,16 @@ import {
 import { trainRoutes } from "@/data/trains";
 import type { TrainRoute } from "@/data/trains";
 import { computeLiveStatus } from "@/lib/liveStatus";
-import type { LiveStatus } from "@/lib/liveStatus";
 import { useLiveClock } from "./useLiveClock";
 import { EtaConfidenceBadge } from "./EtaConfidenceBadge";
 import { DelayReasonTag } from "./DelayReasonTag";
+import { ModelEvalPanel } from "./ModelEvalPanel";
+import { RetrainAccuracyPanel } from "./RetrainAccuracyPanel";
+import { CascadePanel } from "./CascadePanel";
+import { SourceTierBadge } from "./SourceTierBadge";
+import { useEngineEta } from "@/hooks/useEngineEta";
 import { DELAY_REASONS } from "@/lib/delayReasons";
 import type { DelayReason } from "@/lib/delayReasons";
-import { historicalDelayAt } from "@/lib/etaModel";
 
 const reasonColors: Record<DelayReason, string> = {
   weather: "#38bdf8",
@@ -212,49 +214,11 @@ function getStationZone(stationCode: string): string {
 }
 
 function getTrainZone(train: TrainRoute): string {
+  if (train.zone) return train.zone;
   if (train.halts.length > 0) {
     return getStationZone(train.halts[0]!.code);
   }
   return "NR";
-}
-
-/**
- * Dynamically evaluate the model performance vs static schedule baseline across all route halts.
- */
-function computeModelEvaluation(trains: TrainRoute[], now: Date) {
-  let totalHaltObs = 0;
-  let sumModelAbsError = 0;
-  let sumBaselineAbsError = 0;
-
-  trains.forEach((t) => {
-    const live = computeLiveStatus(t, now);
-    live.haltStatus.forEach((hs, idx) => {
-      const histDelay = historicalDelayAt(t, idx);
-      const predictedDelay = hs.forecast?.delayMin ?? 0;
-
-      const modelError = Math.abs(predictedDelay - histDelay);
-      const baselineError = Math.abs(0 - histDelay); // Static schedule assumes zero delay buffer
-
-      sumModelAbsError += modelError;
-      sumBaselineAbsError += baselineError;
-      totalHaltObs++;
-    });
-  });
-
-  const maeModel = totalHaltObs ? (sumModelAbsError / totalHaltObs).toFixed(1) : "0.0";
-  const maeBaseline = totalHaltObs ? (sumBaselineAbsError / totalHaltObs).toFixed(1) : "0.0";
-  const errorReductionPct =
-    totalHaltObs && sumBaselineAbsError
-      ? Math.round(((sumBaselineAbsError - sumModelAbsError) / sumBaselineAbsError) * 100)
-      : 0;
-
-  return {
-    maeMinutes: Number(maeModel),
-    baselineMaeMinutes: Number(maeBaseline),
-    errorReductionPercent: errorReductionPct,
-    sampleSize: totalHaltObs,
-    evaluationWindow: "90-day rolling window",
-  };
 }
 
 export function ControlRoomDashboard() {
@@ -294,11 +258,6 @@ export function ControlRoomDashboard() {
     () => (now ? trainRoutes.map((t) => ({ t, s: computeLiveStatus(t, now) })) : []),
     [now],
   );
-
-  // Model Evaluation Performance metrics
-  const modelPerf = useMemo(() => {
-    return computeModelEvaluation(trainRoutes, now ?? new Date());
-  }, [now]);
 
   const fleet = useMemo(() => {
     const running = statuses.filter((x) => x.s.state === "running" || x.s.state === "halted");
@@ -458,6 +417,9 @@ export function ControlRoomDashboard() {
         </div>
       </div>
 
+      <SpotlightEta />
+      <CascadePanel incomingTrainNo="12951" stationCode="NDLS" />
+
       {/* 7. Weather Advisory Banner */}
       {!isBannerDismissed && weatherAdvisory && (
         <div className="flex items-start justify-between gap-3 rounded-2xl border border-sky-500/30 bg-sky-500/10 p-4 text-sky-950 dark:text-sky-100 shadow-sm animate-in fade-in duration-300">
@@ -526,96 +488,9 @@ export function ControlRoomDashboard() {
         </div>
       </div>
 
-      {/* 3. Model Performance Panel */}
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-card">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 pb-3">
-          <div className="flex items-center gap-2">
-            <Target className="size-4 text-primary" />
-            <h3 className="text-sm font-bold text-foreground">Model Forecasting Performance</h3>
-          </div>
-          <span className="rounded-md bg-secondary px-2 py-0.5 font-mono text-[11px] font-semibold text-primary">
-            {modelPerf.evaluationWindow}
-          </span>
-        </div>
+      <ModelEvalPanel />
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-border/60 bg-secondary/20 p-3">
-            <p className="text-[11px] font-medium text-muted-foreground">
-              Model Mean Absolute Error (MAE)
-            </p>
-            <p className="mt-1 font-mono text-2xl font-extrabold text-primary">
-              {modelPerf.maeMinutes}{" "}
-              <span className="text-xs font-normal text-muted-foreground">min</span>
-            </p>
-            <p className="mt-0.5 text-[10px] text-muted-foreground">
-              Average prediction delta across halts
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-border/60 bg-secondary/20 p-3">
-            <p className="text-[11px] font-medium text-muted-foreground">Static Baseline Error</p>
-            <p className="mt-1 font-mono text-2xl font-extrabold text-muted-foreground">
-              {modelPerf.baselineMaeMinutes}{" "}
-              <span className="text-xs font-normal text-muted-foreground">min</span>
-            </p>
-            <p className="mt-0.5 text-[10px] text-muted-foreground">
-              Schedule + static recovery baseline error
-            </p>
-          </div>
-
-          <div
-            className={`rounded-xl border p-3 ${
-              modelPerf.errorReductionPercent >= 0
-                ? "border-emerald-500/20 bg-emerald-500/5"
-                : "border-amber-500/20 bg-amber-500/5"
-            }`}
-          >
-            <p
-              className={`text-[11px] font-medium ${
-                modelPerf.errorReductionPercent >= 0
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-amber-600 dark:text-amber-400"
-              }`}
-            >
-              {modelPerf.errorReductionPercent >= 0
-                ? "Accuracy Improvement"
-                : "Error vs Static Baseline"}
-            </p>
-            <p
-              className={`mt-1 font-mono text-2xl font-extrabold ${
-                modelPerf.errorReductionPercent >= 0
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-amber-600 dark:text-amber-400"
-              }`}
-            >
-              {modelPerf.errorReductionPercent >= 0
-                ? `+${modelPerf.errorReductionPercent}%`
-                : `${modelPerf.errorReductionPercent}%`}
-            </p>
-            <p
-              className={`mt-0.5 text-[10px] ${
-                modelPerf.errorReductionPercent >= 0
-                  ? "text-emerald-600/80 dark:text-emerald-400/80"
-                  : "text-amber-600/80 dark:text-amber-400/80"
-              }`}
-            >
-              {modelPerf.errorReductionPercent >= 0
-                ? "Error reduction vs static schedule"
-                : "Variance vs static schedule (0-delay assumption)"}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-border/60 bg-secondary/20 p-3">
-            <p className="text-[11px] font-medium text-muted-foreground">Evaluation Sample Size</p>
-            <p className="mt-1 font-mono text-2xl font-extrabold text-foreground">
-              {modelPerf.sampleSize.toLocaleString()}
-            </p>
-            <p className="mt-0.5 text-[10px] text-muted-foreground">
-              Halt observations in test cohort
-            </p>
-          </div>
-        </div>
-      </section>
+      <RetrainAccuracyPanel />
 
       {/* Analytics Charts Row: Delay Cause Distribution & Zone-Wise Delay Breakdown */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -911,6 +786,33 @@ export function ControlRoomDashboard() {
         )}
       </section>
     </div>
+  );
+}
+
+function SpotlightEta() {
+  const { payload } = useEngineEta("12951", "NDLS");
+  if (!payload) {
+    return (
+      <section className="rounded-2xl border border-border bg-card p-4" aria-label="Spotlight ETA">
+        <p className="text-sm text-muted-foreground">Loading engine ETA…</p>
+      </section>
+    );
+  }
+  return (
+    <section
+      className="rounded-2xl border border-border bg-card p-4"
+      aria-label="Spotlight ETA"
+      data-testid="engine-spotlight"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="text-sm font-bold uppercase tracking-wide">Spotlight · 12951 → NDLS</h2>
+        <SourceTierBadge source={payload.source} />
+        <EtaConfidenceBadge confidence={payload.confidence} />
+      </div>
+      <p className="mt-2 font-mono text-2xl font-bold" data-engine-eta={payload.eta}>
+        {payload.eta}
+      </p>
+    </section>
   );
 }
 

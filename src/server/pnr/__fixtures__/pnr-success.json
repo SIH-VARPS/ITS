@@ -1,0 +1,26 @@
+{
+  "success": true,
+  "data": {
+    "pnrNumber": "1234567890",
+    "trainNumber": "12001",
+    "trainName": "BPL - NDLS S",
+    "sourceStation": { "code": "HBJ", "name": "HABIBGANJ" },
+    "destinationStation": { "code": "NDLS", "name": "NEW DELHI" },
+    "boardingStation": { "code": "HBJ", "name": "HABIBGANJ" },
+    "dateOfJourney": "15 Mar 2026",
+    "class": "3A",
+    "quota": "GN",
+    "chartPrepared": true,
+    "passengers": [
+      {
+        "number": 1,
+        "bookingStatus": "CNF/B1/21",
+        "currentStatus": "CNF/B1/21",
+        "coach": "B1",
+        "berth": 21,
+        "berthType": "Lower"
+      }
+    ],
+    "fare": 2150
+  }
+}

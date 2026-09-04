@@ -9,22 +9,22 @@ import {
   useMap,
   useMapsLibrary,
 } from "@vis.gl/react-google-maps";
-import {
-  TrainFront,
-  Layers,
-  Key,
-  Check,
-  AlertTriangle,
-  Clock,
-  Compass,
-  ArrowRight,
-  SlidersHorizontal,
-} from "lucide-react";
+import { TrainFront, Layers, Key, Check, Compass, ArrowRight } from "lucide-react";
 import { trainRoutes } from "@/data/trains";
 import type { TrainRoute } from "@/data/trains";
 import { computeLiveStatus } from "@/lib/liveStatus";
 import type { LiveStatus } from "@/lib/liveStatus";
 import { useLiveClock } from "@/components/rail/useLiveClock";
+
+type FeedSource = "railradar" | "crowd" | "replay";
+
+type LiveOverlay = {
+  lat: number;
+  lng: number;
+  delayMin: number;
+  source: FeedSource;
+  diverted: boolean;
+};
 
 const DEFAULT_MAPS_KEY =
   (typeof import.meta !== "undefined" && import.meta.env?.["VITE_GOOGLE_MAPS_API_KEY"]) ||
@@ -130,7 +130,9 @@ export function NetworkMap({ className = "" }: Props) {
   const [selectedTrain, setSelectedTrain] = useState<{
     train: TrainRoute;
     status: LiveStatus;
+    source?: FeedSource;
   } | null>(null);
+  const [overlays, setOverlays] = useState<Record<string, LiveOverlay>>({});
 
   // Live simulation tick every 4 seconds
   const now = useLiveClock(4000);
@@ -141,6 +143,47 @@ export function NetworkMap({ className = "" }: Props) {
       setApiKey(saved);
     }
   }, [apiKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function pullPositions() {
+      try {
+        const response = await fetch("/api/v2/live/positions");
+        if (!response.ok) return;
+        const payload = (await response.json()) as {
+          trains?: Array<{
+            trainNo: string;
+            lat?: number;
+            lng?: number;
+            delayMin?: number;
+            source?: FeedSource;
+            diverted?: boolean;
+          }>;
+        };
+        if (cancelled || !payload.trains) return;
+        const next: Record<string, LiveOverlay> = {};
+        for (const row of payload.trains) {
+          if (row.lat === undefined || row.lng === undefined) continue;
+          next[row.trainNo] = {
+            lat: row.lat,
+            lng: row.lng,
+            delayMin: row.delayMin ?? 0,
+            source: row.source ?? "replay",
+            diverted: row.diverted === true,
+          };
+        }
+        setOverlays(next);
+      } catch {
+        /* keep last overlay */
+      }
+    }
+    void pullPositions();
+    const timer = window.setInterval(() => void pullPositions(), 8_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const handleSaveKey = (keyToSave: string) => {
     const trimmed = keyToSave.trim();
@@ -153,10 +196,14 @@ export function NetworkMap({ className = "" }: Props) {
   const liveTrains = useMemo(() => {
     return trainRoutes.map((train) => {
       const status = computeLiveStatus(train, now ?? new Date());
-      const isLate = (status.forecast?.delayMin ?? 0) > 2;
-      return { train, status, isLate };
+      const overlay = overlays[train.number];
+      const merged: LiveStatus = overlay
+        ? { ...status, lat: overlay.lat, lng: overlay.lng, delay: overlay.delayMin }
+        : status;
+      const isLate = (merged.forecast?.delayMin ?? merged.delay ?? 0) > 2;
+      return { train, status: merged, isLate, source: overlay?.source };
     });
-  }, [now]);
+  }, [now, overlays]);
 
   const filteredTrains = useMemo(() => {
     if (filterMode === "delayed") {
@@ -167,6 +214,15 @@ export function NetworkMap({ className = "" }: Props) {
     }
     return liveTrains;
   }, [liveTrains, filterMode]);
+
+  const dominantSource = useMemo(() => {
+    const counts: Record<FeedSource, number> = { railradar: 0, crowd: 0, replay: 0 };
+    for (const row of liveTrains) {
+      if (row.source) counts[row.source] += 1;
+    }
+    const ranked = (Object.entries(counts) as [FeedSource, number][]).sort((a, b) => b[1] - a[1]);
+    return ranked[0] && ranked[0][1] > 0 ? ranked[0][0] : "replay";
+  }, [liveTrains]);
 
   // Center coordinate for India
   const defaultCenter = { lat: 22.5937, lng: 78.9629 };
@@ -274,6 +330,12 @@ export function NetworkMap({ className = "" }: Props) {
               Delayed
             </button>
           </div>
+          <span
+            className="rounded-md border border-border bg-card px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+            data-testid="live-feed-tier"
+          >
+            feed {dominantSource}
+          </span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -366,12 +428,12 @@ export function NetworkMap({ className = "" }: Props) {
               <NetworkCameraHandler routes={trainRoutes} />
 
               {/* 3. Live Train Markers Across India */}
-              {filteredTrains.map(({ train, status, isLate }) => (
+              {filteredTrains.map(({ train, status, isLate, source }) => (
                 <AdvancedMarker
                   key={train.number}
                   position={{ lat: status.lat, lng: status.lng }}
                   title={`${train.number} ${train.name} (${status.speed} km/h)`}
-                  onClick={() => setSelectedTrain({ train, status })}
+                  onClick={() => setSelectedTrain({ train, status, ...(source ? { source } : {}) })}
                   zIndex={isLate ? 60 : 50}
                 >
                   <div className="group relative flex flex-col items-center cursor-pointer transition-transform hover:scale-125">
@@ -422,6 +484,9 @@ export function NetworkMap({ className = "" }: Props) {
                           : "On Time"}
                       </span>
                     </div>
+                    <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-slate-500">
+                      tier {selectedTrain.source ?? "replay"}
+                    </p>
 
                     <h4 className="mt-1 text-xs font-bold text-slate-900">
                       {selectedTrain.train.name}

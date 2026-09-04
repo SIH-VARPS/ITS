@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, Link } from "@tanstack/react-router";
 import {
   ArrowRight,
@@ -14,7 +14,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { findTrains, trainRoutes } from "@/data/trains";
+import { findTrains } from "@/data/trains";
 import { stationMap } from "@/data/generated/stations";
 import { useTranslation } from "@/lib/i18n";
 
@@ -47,22 +47,30 @@ export function SearchPanel() {
       .slice(0, 4);
   }, [to]);
 
-  const between = useMemo(() => {
-    const f = from.trim().toLowerCase();
-    const t = to.trim().toLowerCase();
-    if (!f || !t) return [];
-    return trainRoutes.filter((r) => {
-      const fi = r.halts.findIndex(
-        (s) => s.code.toLowerCase() === f || s.name.toLowerCase().includes(f),
-      );
-      const ti = r.halts.findIndex(
-        (s) => s.code.toLowerCase() === t || s.name.toLowerCase().includes(t),
-      );
-      return fi !== -1 && ti !== -1 && fi < ti;
-    });
-  }, [from, to]);
-
   const [showBetween, setShowBetween] = useState(false);
+  const [between, setBetween] = useState<{ number: string; name: string }[]>([]);
+
+  useEffect(() => {
+    if (!showBetween) return;
+    const origin = from.trim();
+    const dest = to.trim();
+    if (!origin || !dest) {
+      setBetween([]);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/v1/between?from=${encodeURIComponent(origin)}&to=${encodeURIComponent(dest)}`)
+      .then((res) => res.json())
+      .then((body: { data?: { trains?: { number: string; name: string }[] } }) => {
+        if (!cancelled) setBetween(body.data?.trains ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setBetween([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showBetween, from, to]);
 
   const swap = () => {
     setFrom(to);

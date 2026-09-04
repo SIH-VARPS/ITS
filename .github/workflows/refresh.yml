@@ -1,0 +1,46 @@
+name: Refresh RailRadar harvest
+
+# R11: this corpus only grows with wall-clock time and cannot be backfilled.
+# Requires repository secret RAILRADAR_API_KEY. The script fails loudly if it is missing.
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Harvest hot-set trains
+        env:
+          RAILRADAR_API_KEY: ${{ secrets.RAILRADAR_API_KEY }}
+        run: node scripts/harvest.mjs
+
+      - name: Warm deployed live cache
+        if: ${{ vars.APP_URL != '' }}
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          INTERNAL_REFRESH_SECRET: ${{ secrets.INTERNAL_REFRESH_SECRET }}
+        run: |
+          curl -fsS -X POST "$APP_URL/api/v2/internal/refresh" -H "x-refresh-secret: $INTERNAL_REFRESH_SECRET"
+
+      - name: Upload harvest JSONL
+        uses: actions/upload-artifact@v4
+        with:
+          name: harvest-corpus
+          path: data/harvest/**/*.jsonl
+          if-no-files-found: error
+          retention-days: 90

@@ -2,7 +2,17 @@ node_modules
 dist
 .output
 .vinxi
+.vercel
+coverage
+playwright-report
+test-results
+blob-report
 pnpm-lock.yaml
 package-lock.json
 bun.lock
 routeTree.gen.ts
+SIH_PLAN.md
+data/harvest/*.jsonl
+**/legacy-train-full.json
+src/data/generated/**
+src/lib/model/__fixtures__/parity.json

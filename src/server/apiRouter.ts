@@ -1,9 +1,11 @@
+import { handleV2Request } from "./routes/v2";
 import { RailBackendService } from "./services/railBackend";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Headers":
+    "Content-Type, Authorization, X-Refresh-Secret, X-Request-Id, If-None-Match",
   "Content-Type": "application/json; charset=utf-8",
 };
 
@@ -43,7 +45,11 @@ export async function handleApiRequest(request: Request): Promise<Response | nul
     return null;
   }
 
-  // Handle CORS preflight
+  if (pathname.startsWith("/api/v2")) {
+    return handleV2Request(request);
+  }
+
+  // Handle CORS preflight for v1
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
@@ -71,7 +77,7 @@ export async function handleApiRequest(request: Request): Promise<Response | nul
           {
             path: "/api/v1/train/:number/live",
             method: "GET",
-            description: "Real-time GPS coordinates, speed, ETA predictions, delay reason",
+            description: "Predicted coordinates, speed, ETA predictions, delay reason",
           },
           {
             path: "/api/v1/train/:number/timetable",
@@ -156,7 +162,21 @@ export async function handleApiRequest(request: Request): Promise<Response | nul
       });
     }
 
-    // 4. GET /api/v1/train/:number/timetable
+    // 4. GET /api/v1/train/:number/route (full TrainRoute for client pages)
+    const routeMatch = pathname.match(/^\/api(?:\/v1)?\/train\/([^/]+)\/route$/);
+    if (routeMatch) {
+      const trainNumber = decodeURIComponent(routeMatch[1]!);
+      const route = RailBackendService.getTrainRoute(trainNumber);
+      if (!route) {
+        return errorResponse(`Train with number '${trainNumber}' not found.`, 404);
+      }
+      return jsonResponse({
+        success: true,
+        data: route,
+      });
+    }
+
+    // 5. GET /api/v1/train/:number/timetable
     const ttMatch = pathname.match(/^\/api(?:\/v1)?\/train\/([^/]+)\/timetable$/);
     if (ttMatch) {
       const trainNumber = decodeURIComponent(ttMatch[1]!);
@@ -271,7 +291,7 @@ export async function handleApiRequest(request: Request): Promise<Response | nul
     const pnrMatch = pathname.match(/^\/api(?:\/v1)?\/pnr\/([^/]+)$/);
     if (pnrMatch) {
       const pnr = decodeURIComponent(pnrMatch[1]!);
-      const status = RailBackendService.getPnrStatus(pnr);
+      const status = await RailBackendService.getPnrStatus(pnr);
       if (!status) {
         return errorResponse("Invalid PNR format. PNR must be a 10-digit numeric string.", 400);
       }

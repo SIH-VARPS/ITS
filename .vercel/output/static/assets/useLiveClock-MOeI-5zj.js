@@ -1,0 +1,1 @@
+import{X as e,q as t}from"./catalog-DwZOoQZY.js";var n=e(t(),1);function r(e=5e3){let[t,r]=(0,n.useState)(null);return(0,n.useEffect)(()=>{r(new Date);let t=setInterval(()=>r(new Date),e);return()=>clearInterval(t)},[e]),t}export{r as t};

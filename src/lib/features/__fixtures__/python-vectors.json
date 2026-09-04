@@ -1,0 +1,102 @@
+[
+  {
+    "trainNo": "12001",
+    "haltIndex": 0,
+    "at": "2026-01-05T15:00:00+05:30",
+    "vector": {
+      "trainNo": "12001",
+      "fromStationCode": "HBJ",
+      "toStationCode": "BPL",
+      "currentDelayMin": 0.0,
+      "delayTrendMin": 0.0,
+      "sectionMeanRunMin": 25.0,
+      "sectionP80RunMin": 31.0,
+      "hourOfDay": 15,
+      "dayOfWeek": 1,
+      "season": 1,
+      "dayOfJourney": 1,
+      "trainClass": "Express",
+      "remainingKm": 688.0,
+      "remainingHalts": 9,
+      "downstreamOccupancy": 0.0,
+      "weatherCode": 0,
+      "dwellOverrunMin": 0.0,
+      "speedDeviationKmph": 0.0
+    }
+  },
+  {
+    "trainNo": "12001",
+    "haltIndex": 0,
+    "at": "2026-01-06T15:01:38.507984+05:30",
+    "vector": {
+      "trainNo": "12001",
+      "fromStationCode": "HBJ",
+      "toStationCode": "BPL",
+      "currentDelayMin": 1.641799729145196,
+      "delayTrendMin": 0.0,
+      "sectionMeanRunMin": 25.0,
+      "sectionP80RunMin": 31.0,
+      "hourOfDay": 15,
+      "dayOfWeek": 2,
+      "season": 1,
+      "dayOfJourney": 1,
+      "trainClass": "Express",
+      "remainingKm": 688.0,
+      "remainingHalts": 9,
+      "downstreamOccupancy": 0.0,
+      "weatherCode": 45,
+      "dwellOverrunMin": 0.0,
+      "speedDeviationKmph": 0.0
+    }
+  },
+  {
+    "trainNo": "12001",
+    "haltIndex": 0,
+    "at": "2026-01-07T15:01:58.659846+05:30",
+    "vector": {
+      "trainNo": "12001",
+      "fromStationCode": "HBJ",
+      "toStationCode": "BPL",
+      "currentDelayMin": 1.9776640931070424,
+      "delayTrendMin": 0.0,
+      "sectionMeanRunMin": 25.0,
+      "sectionP80RunMin": 31.0,
+      "hourOfDay": 15,
+      "dayOfWeek": 3,
+      "season": 1,
+      "dayOfJourney": 1,
+      "trainClass": "Express",
+      "remainingKm": 688.0,
+      "remainingHalts": 9,
+      "downstreamOccupancy": 0.0,
+      "weatherCode": 0,
+      "dwellOverrunMin": 0.0,
+      "speedDeviationKmph": 0.0
+    }
+  },
+  {
+    "trainNo": "12001",
+    "haltIndex": 0,
+    "at": "2026-01-08T15:03:06.943099+05:30",
+    "vector": {
+      "trainNo": "12001",
+      "fromStationCode": "HBJ",
+      "toStationCode": "BPL",
+      "currentDelayMin": 3.115718311760104,
+      "delayTrendMin": 0.0,
+      "sectionMeanRunMin": 25.0,
+      "sectionP80RunMin": 31.0,
+      "hourOfDay": 15,
+      "dayOfWeek": 4,
+      "season": 1,
+      "dayOfJourney": 1,
+      "trainClass": "Express",
+      "remainingKm": 688.0,
+      "remainingHalts": 9,
+      "downstreamOccupancy": 0.0,
+      "weatherCode": 0,
+      "dwellOverrunMin": 0.0,
+      "speedDeviationKmph": 0.0
+    }
+  }
+]

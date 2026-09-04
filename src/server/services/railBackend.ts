@@ -1,7 +1,14 @@
-import { trainRoutes, type TrainRoute } from "../../data/trains";
+import { featuredRoutes } from "../../data/generated/featured";
+import { catalogTrains } from "../../data/generated/catalog";
 import { stationMap, stationFor, type Station } from "../../data/generated/stations";
-import { computeLiveStatus, fmtMinutes, type LiveStatus } from "../../lib/liveStatus";
+import type { TrainRoute } from "../../data/trainTypes";
+import { computeLiveStatus, fmtMinutes, materializeHaltForecast } from "../../lib/liveStatus";
 import { DELAY_REASONS, type DelayReason } from "../../lib/delayReasons";
+import { resolvePnrStatus } from "../pnr/resolvePnr";
+import type { PnrStatus } from "../pnr/types";
+import { getTrainByNumber, getTrainsCallingAt, ROUTE_COUNT } from "../trains/store.server";
+
+export type { PnrStatus };
 
 export type TrainSearchOptions = {
   query?: string | undefined;
@@ -11,34 +18,6 @@ export type TrainSearchOptions = {
   to?: string | undefined;
   limit?: number | undefined;
   offset?: number | undefined;
-};
-
-export type PnrStatus = {
-  pnr: string;
-  trainNumber: string;
-  trainName: string;
-  fromStation: { code: string; name: string };
-  toStation: { code: string; name: string };
-  boardingStation: { code: string; name: string };
-  journeyDate: string;
-  bookingClass: string;
-  quota: string;
-  chartStatus: "CHART PREPARED" | "CHART NOT PREPARED";
-  passengers: {
-    number: number;
-    bookingStatus: string;
-    currentStatus: string;
-    coach: string;
-    berth: number;
-    berthType: "Lower" | "Middle" | "Upper" | "Side Lower" | "Side Upper" | "Window" | "Aisle";
-  }[];
-  fare: number;
-  liveStatus: {
-    speed: number;
-    delay: number;
-    nextStation: string;
-    eta: string;
-  };
 };
 
 export type ConnectingImpactResult = {
@@ -81,39 +60,11 @@ export class RailBackendService {
   static searchTrains(options: TrainSearchOptions = {}) {
     const { query = "", type, state, from, to, limit = 20, offset = 0 } = options;
     const q = query.trim().toLowerCase();
-    const fromQ = from?.trim().toLowerCase();
-    const toQ = to?.trim().toLowerCase();
+    const fromQ = from?.trim().toUpperCase();
+    const toQ = to?.trim().toUpperCase();
     const now = new Date();
 
-    let results = trainRoutes;
-
-    if (q) {
-      results = results.filter(
-        (t) =>
-          t.number.includes(q) ||
-          t.name.toLowerCase().includes(q) ||
-          t.halts.some((h) => h.code.toLowerCase() === q || h.name.toLowerCase().includes(q)),
-      );
-    }
-
-    if (type && type !== "all") {
-      results = results.filter((t) => t.type.toLowerCase() === type.toLowerCase());
-    }
-
-    if (fromQ && toQ) {
-      results = results.filter((t) => {
-        const fi = t.halts.findIndex(
-          (h) => h.code.toLowerCase() === fromQ || h.name.toLowerCase().includes(fromQ),
-        );
-        const ti = t.halts.findIndex(
-          (h) => h.code.toLowerCase() === toQ || h.name.toLowerCase().includes(toQ),
-        );
-        return fi !== -1 && ti !== -1 && fi < ti;
-      });
-    }
-
-    // Enrich with live state if requested
-    const enriched = results.map((t) => {
+    const enrich = (t: TrainRoute) => {
       const live = computeLiveStatus(t, now);
       return {
         number: t.number,
@@ -139,21 +90,82 @@ export class RailBackendService {
           progressPercent: Math.round(live.progress),
         },
       };
-    });
+    };
 
-    let filtered = enriched;
-    if (state && state !== "running") {
-      if (state === "on-time") {
-        filtered = filtered.filter((t) => t.live.delayMinutes <= 2);
-      } else if (state === "delayed") {
-        filtered = filtered.filter((t) => t.live.delayMinutes > 2);
-      } else if (state === "halted") {
-        filtered = filtered.filter((t) => t.live.state === "halted");
+    let results: TrainRoute[];
+
+    if (fromQ && toQ) {
+      results = getTrainsCallingAt(fromQ).filter((t) => {
+        const fi = t.halts.findIndex((h) => h.code.toUpperCase() === fromQ);
+        const ti = t.halts.findIndex((h) => h.code.toUpperCase() === toQ);
+        return fi !== -1 && ti !== -1 && fi < ti;
+      });
+    } else if (q) {
+      const byMeta = catalogTrains.filter(
+        (t) =>
+          t.number.toLowerCase().includes(q) ||
+          t.name.toLowerCase().includes(q) ||
+          t.origin.toLowerCase() === q ||
+          t.destination.toLowerCase() === q,
+      );
+      const found = new Map<string, TrainRoute>();
+      for (const summary of byMeta) {
+        const train = getTrainByNumber(summary.number);
+        if (train) found.set(train.number, train);
       }
+      for (const train of getTrainsCallingAt(q.toUpperCase())) {
+        found.set(train.number, train);
+      }
+      results = [...found.values()];
+    } else if (state && state !== "running") {
+      results = featuredRoutes.slice();
+    } else {
+      let list = catalogTrains;
+      if (type && type !== "all") {
+        list = list.filter((t) => t.type.toLowerCase() === type.toLowerCase());
+      }
+      const total = list.length;
+      const items = list
+        .slice(offset, offset + limit)
+        .map((summary) => getTrainByNumber(summary.number))
+        .filter((train): train is TrainRoute => Boolean(train))
+        .map(enrich);
+      return { total, offset, limit, items };
     }
 
-    const total = filtered.length;
-    const items = filtered.slice(offset, offset + limit);
+    if (q) {
+      results = results.filter(
+        (t) =>
+          t.number.toLowerCase().includes(q) ||
+          t.name.toLowerCase().includes(q) ||
+          t.halts.some((h) => h.code.toLowerCase() === q || h.name.toLowerCase().includes(q)),
+      );
+    }
+
+    if (type && type !== "all") {
+      results = results.filter((t) => t.type.toLowerCase() === type.toLowerCase());
+    }
+
+    if (state && state !== "running") {
+      const enriched = results.map(enrich);
+      const filtered =
+        state === "on-time"
+          ? enriched.filter((t) => t.live.delayMinutes <= 2)
+          : state === "delayed"
+            ? enriched.filter((t) => t.live.delayMinutes > 2)
+            : state === "halted"
+              ? enriched.filter((t) => t.live.state === "halted")
+              : enriched;
+      return {
+        total: filtered.length,
+        offset,
+        limit,
+        items: filtered.slice(offset, offset + limit),
+      };
+    }
+
+    const total = results.length;
+    const items = results.slice(offset, offset + limit).map(enrich);
 
     return {
       total,
@@ -167,7 +179,7 @@ export class RailBackendService {
    * Get real-time status of a specific train.
    */
   static getTrainLiveStatus(trainNumber: string, date = new Date()) {
-    const train = trainRoutes.find((t) => t.number === trainNumber);
+    const train = getTrainByNumber(trainNumber);
     if (!train) return null;
 
     const live = computeLiveStatus(train, date);
@@ -239,7 +251,7 @@ export class RailBackendService {
    * Get full timetable for a train.
    */
   static getTrainTimetable(trainNumber: string) {
-    const train = trainRoutes.find((t) => t.number === trainNumber);
+    const train = getTrainByNumber(trainNumber);
     if (!train) return null;
 
     return {
@@ -288,7 +300,7 @@ export class RailBackendService {
     const stationInfo = stationFor(upperCode);
     const now = new Date();
 
-    const services = trainRoutes
+    const services = getTrainsCallingAt(upperCode)
       .map((t) => {
         const idx = t.halts.findIndex((h) => h.code.toUpperCase() === upperCode);
         if (idx === -1) return null;
@@ -298,7 +310,8 @@ export class RailBackendService {
         const isLast = idx === t.halts.length - 1;
         const type = isFirst ? "Departure" : isLast ? "Terminal" : "Arrival";
         const scheduledTime = fmtMinutes(t.startsAt + (isFirst ? halt.dep : halt.arr));
-        const haltForecast = status.haltStatus.find((h) => h.halt.code === upperCode)?.forecast;
+        const haltIdx = idx;
+        const haltForecast = materializeHaltForecast(t, status, haltIdx, now);
         const predictedTime = haltForecast ? haltForecast.eta : scheduledTime;
 
         return {
@@ -356,7 +369,7 @@ export class RailBackendService {
     const t = toCode.trim().toUpperCase();
     const now = new Date();
 
-    const matches = trainRoutes
+    const matches = getTrainsCallingAt(f)
       .map((route) => {
         const fi = route.halts.findIndex((h) => h.code.toUpperCase() === f);
         const ti = route.halts.findIndex((h) => h.code.toUpperCase() === t);
@@ -400,7 +413,7 @@ export class RailBackendService {
    */
   static getControlRoomMetrics() {
     const now = new Date();
-    const statuses = trainRoutes.map((t) => ({ t, s: computeLiveStatus(t, now) }));
+    const statuses = featuredRoutes.map((t) => ({ t, s: computeLiveStatus(t, now) }));
 
     const running = statuses.filter((x) => x.s.state === "running" || x.s.state === "halted");
     const onTime = running.filter((x) => (x.s.forecast?.delayMin ?? 0) <= 2).length;
@@ -438,7 +451,7 @@ export class RailBackendService {
     return {
       timestamp: now.toISOString(),
       kpis: {
-        totalTrackedTrains: trainRoutes.length,
+        totalTrackedTrains: ROUTE_COUNT,
         currentlyRunning: running.length,
         onTimeCount: onTime,
         delayedCount: late,
@@ -460,8 +473,8 @@ export class RailBackendService {
     transferStationCode: string,
   ): ConnectingImpactResult | null {
     const upperStation = transferStationCode.toUpperCase();
-    const inTrain = trainRoutes.find((t) => t.number === incomingTrainNo);
-    const connTrain = trainRoutes.find((t) => t.number === connectingTrainNo);
+    const inTrain = getTrainByNumber(incomingTrainNo);
+    const connTrain = getTrainByNumber(connectingTrainNo);
 
     if (!inTrain || !connTrain) return null;
 
@@ -472,9 +485,9 @@ export class RailBackendService {
 
     const now = new Date();
     const inStatus = computeLiveStatus(inTrain, now);
-    const haltForecast = inStatus.haltStatus.find(
-      (h) => h.halt.code.toUpperCase() === upperStation,
-    )?.forecast;
+    const inHaltIdx = inTrain.halts.findIndex((h) => h.code.toUpperCase() === upperStation);
+    const haltForecast =
+      inHaltIdx >= 0 ? materializeHaltForecast(inTrain, inStatus, inHaltIdx, now) : null;
 
     const scheduledArrivalMin = inTrain.startsAt + inHalt.arr;
     const scheduledDepMin = connTrain.startsAt + connHalt.dep;
@@ -504,7 +517,7 @@ export class RailBackendService {
     }
 
     // Alternative departures from transfer junction
-    const alternatives = trainRoutes
+    const alternatives = getTrainsCallingAt(upperStation)
       .filter(
         (t) =>
           t.number !== connectingTrainNo &&
@@ -553,80 +566,18 @@ export class RailBackendService {
     };
   }
 
+  static getTrainRoute(trainNumber: string) {
+    return getTrainByNumber(trainNumber) ?? null;
+  }
+
   /**
-   * Realistic 10-digit Indian Railways PNR status validator & engine.
+   * 10-digit PNR: live RailRadar when a key is present, otherwise DEMO_MODE
+   * synthetic fallback. Never throws on a missing key.
    */
-  static getPnrStatus(pnr: string): PnrStatus | null {
-    const cleaned = pnr.replace(/\D/g, "");
-    if (cleaned.length !== 10) return null;
-
-    // Use deterministic hash of PNR so querying the same PNR returns consistent results
-    let seed = 0;
-    for (let i = 0; i < cleaned.length; i++) {
-      seed = (seed * 31 + cleaned.charCodeAt(i)) % 100000;
-    }
-
-    const trainIdx = seed % trainRoutes.length;
-    const train = trainRoutes[trainIdx]!;
-    const origin = train.halts[0]!;
-    const dest = train.halts[train.halts.length - 1]!;
-    const now = new Date();
-    const live = computeLiveStatus(train, now);
-
-    const classes = ["1A", "2A", "3A", "SL", "CC", "EC"];
-    const bookingClass = classes[seed % classes.length]!;
-
-    const passengerCount = (seed % 3) + 1;
-    const berthTypes: PnrStatus["passengers"][number]["berthType"][] = [
-      "Lower",
-      "Middle",
-      "Upper",
-      "Side Lower",
-      "Side Upper",
-    ];
-
-    const coachPrefix =
-      bookingClass === "SL" ? "S" : bookingClass === "3A" ? "B" : bookingClass === "2A" ? "A" : "H";
-    const coachNum = (seed % 6) + 1;
-    const coach = `${coachPrefix}${coachNum}`;
-
-    const passengers: PnrStatus["passengers"] = [];
-    for (let i = 1; i <= passengerCount; i++) {
-      const berthNo = ((seed + i * 7) % 72) + 1;
-      const bType = berthTypes[berthNo % berthTypes.length]!;
-      passengers.push({
-        number: i,
-        bookingStatus: `CNF/${coach}/${berthNo}`,
-        currentStatus: `CNF/${coach}/${berthNo}`,
-        coach,
-        berth: berthNo,
-        berthType: bType,
-      });
-    }
-
-    return {
-      pnr: cleaned,
-      trainNumber: train.number,
-      trainName: train.name,
-      fromStation: { code: origin.code, name: origin.name },
-      toStation: { code: dest.code, name: dest.name },
-      boardingStation: { code: origin.code, name: origin.name },
-      journeyDate: now.toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }),
-      bookingClass,
-      quota: "GN (General Quota)",
-      chartStatus: "CHART PREPARED",
-      passengers,
-      fare: 450 + passengerCount * 380 * (classes.indexOf(bookingClass) + 1),
-      liveStatus: {
-        speed: live.speed,
-        delay: live.forecast?.delayMin ?? live.delay,
-        nextStation: live.nextHalt?.name ?? dest.name,
-        eta: live.etaNext,
-      },
-    };
+  static getPnrStatus(
+    pnr: string,
+    opts?: Parameters<typeof resolvePnrStatus>[1],
+  ): Promise<PnrStatus | null> {
+    return resolvePnrStatus(pnr, opts);
   }
 }

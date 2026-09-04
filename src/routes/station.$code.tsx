@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { ArrowLeft, ArrowDownUp, Clock } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
@@ -5,28 +6,17 @@ import { SiteHeader } from "@/components/rail/SiteHeader";
 import { SiteFooter } from "@/components/rail/Sections";
 import { EtaConfidenceBadge } from "@/components/rail/EtaConfidenceBadge";
 import { DelayReasonTag } from "@/components/rail/DelayReasonTag";
-import { useLiveClock } from "@/components/rail/useLiveClock";
-import { trainRoutes } from "@/data/trains";
-import { computeLiveStatus, fmtMinutes } from "@/lib/liveStatus";
 import { stations } from "@/data/rail";
 import { stationFor } from "@/data/generated/stations";
 import { useTranslation } from "@/lib/i18n";
+import type { DelayReason } from "@/lib/delayReasons";
 
 export const Route = createFileRoute("/station/$code")({
   loader: ({ params }) => {
     const code = params.code.toUpperCase();
     const stationInfo = stationFor(code);
     const hardcodedStation = stations.find(([, c]) => c === code);
-    let name = stationInfo?.name || hardcodedStation?.[0];
-    if (!name) {
-      for (const t of trainRoutes) {
-        const foundHalt = t.halts.find((h) => h.code.toUpperCase() === code);
-        if (foundHalt) {
-          name = foundHalt.name;
-          break;
-        }
-      }
-    }
+    const name = stationInfo?.name || hardcodedStation?.[0];
     if (!name && !stationInfo) throw notFound();
     return { code, name: name ?? code };
   },
@@ -35,7 +25,9 @@ export const Route = createFileRoute("/station/$code")({
     const name = loaderData?.name;
     return {
       meta: [
-        { title: `${name ? `${name} (${code})` : "Station"} — Station Board | ITS Indian Train System` },
+        {
+          title: `${name ? `${name} (${code})` : "Station"} — Station Board | ITS Indian Train System`,
+        },
         {
           name: "description",
           content: `Live arrivals and departures with predicted times and platforms at ${name ?? ""} (${code ?? ""}), from the ITS Indian Train System ETA forecasting model.`,
@@ -67,39 +59,44 @@ function StationNotFound() {
   );
 }
 
-type BoardRow = {
-  t: (typeof trainRoutes)[number];
-  halt: (typeof trainRoutes)[number]["halts"][number];
-  status: ReturnType<typeof computeLiveStatus> | null;
-  type: string;
-  scheduled: string;
+type BoardService = {
+  trainNumber: string;
+  trainName: string;
+  serviceType: string;
+  platform: string;
+  scheduledTime: string;
+  predictedTime: string;
+  delayMinutes: number;
+  delayReason: DelayReason | null;
+  confidencePercent: number;
 };
 
 function StationBoard() {
   const { code, name } = Route.useLoaderData();
   const { t } = useTranslation();
-  const now = useLiveClock(4000);
+  const [services, setServices] = useState<BoardService[]>([]);
 
-  const rows: BoardRow[] = trainRoutes
-    .map((tr) => {
-      const idx = tr.halts.findIndex((h) => h.code === code);
-      if (idx === -1) return null;
-      const status = now ? computeLiveStatus(tr, now) : null;
-      const halt = tr.halts[idx]!;
-      const isArrival = idx > 0;
-      const isFirst = idx === 0;
-      const isLast = idx === tr.halts.length - 1;
-      const type = isFirst ? "Departure" : isLast ? "Terminal" : isArrival ? "Arrival" : "Pass";
-      const scheduled = fmtMinutes(tr.startsAt + halt.arr);
-      return { t: tr, halt, status, type, scheduled };
-    })
-    .filter((r): r is NonNullable<typeof r> => r !== null)
-    .sort((a, b) => (a.status?.forecast?.etaMin ?? 0) - (b.status?.forecast?.etaMin ?? 0));
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/v1/station/${encodeURIComponent(code)}/board`)
+      .then((res) => res.json())
+      .then((body: { data?: { services?: BoardService[] } }) => {
+        if (!cancelled) setServices(body.data?.services ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setServices([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
 
-  const arrivals = rows.filter(
-    (r) => r.type === "Arrival" || r.type === "Terminal" || r.type === "Pass",
+  const arrivals = services.filter(
+    (r) => r.serviceType === "Arrival" || r.serviceType === "Terminal",
   );
-  const departures = rows.filter((r) => r.type === "Departure" || r.type === "Pass");
+  const departures = services.filter(
+    (r) => r.serviceType === "Departure" || r.serviceType === "Arrival",
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -150,7 +147,7 @@ function BoardTable({
 }: {
   title: string;
   icon: React.ReactNode;
-  rows: BoardRow[];
+  rows: BoardService[];
 }) {
   const { t } = useTranslation();
 
@@ -167,44 +164,37 @@ function BoardTable({
         </p>
       ) : (
         <ul className="divide-y divide-border">
-          {rows.map(({ t: tr, halt, status, type, scheduled }) => {
-            const predicted = status?.haltStatus?.find((h) => h.halt.code === halt.code)?.forecast
-              ?.eta;
-            const forecast = status?.haltStatus?.find((h) => h.halt.code === halt.code)?.forecast;
-            return (
-              <li key={tr.number} className="px-5 py-3">
-                <Link
-                  to="/train/$number"
-                  params={{ number: tr.number }}
-                  className="flex items-center justify-between gap-3"
-                >
-                  <span>
-                    <span className="block text-sm font-semibold">
-                      <span className="text-muted-foreground">{tr.number}</span> {tr.name}
-                    </span>
-                    <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span className="rounded-full border border-border bg-secondary/50 px-1.5 py-0.5 text-[10px] font-semibold">
-                        {type}
-                      </span>
-                      <span>{t("station.platform", { p: halt.platform })}</span>
-                      {forecast && forecast.delayMin > 2 && (
-                        <DelayReasonTag reason={forecast.reason} />
-                      )}
-                    </span>
+          {rows.map((row) => (
+            <li key={`${row.trainNumber}-${row.serviceType}`} className="px-5 py-3">
+              <Link
+                to="/train/$number"
+                params={{ number: row.trainNumber }}
+                className="flex items-center justify-between gap-3"
+              >
+                <span>
+                  <span className="block text-sm font-semibold">
+                    <span className="text-muted-foreground">{row.trainNumber}</span> {row.trainName}
                   </span>
-                  <span className="text-right">
-                    <span className="block text-sm font-semibold">
-                      <span className="text-muted-foreground line-through">{scheduled}</span> →{" "}
-                      {predicted ?? scheduled}
+                  <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span className="rounded-full border border-border bg-secondary/50 px-1.5 py-0.5 text-[10px] font-semibold">
+                      {row.serviceType}
                     </span>
-                    {forecast && (
-                      <EtaConfidenceBadge confidence={forecast.confidence} className="mt-1" />
+                    <span>{t("station.platform", { p: row.platform })}</span>
+                    {row.delayReason && row.delayMinutes > 2 && (
+                      <DelayReasonTag reason={row.delayReason} />
                     )}
                   </span>
-                </Link>
-              </li>
-            );
-          })}
+                </span>
+                <span className="text-right">
+                  <span className="block text-sm font-semibold">
+                    <span className="text-muted-foreground line-through">{row.scheduledTime}</span>{" "}
+                    → {row.predictedTime}
+                  </span>
+                  <EtaConfidenceBadge confidence={row.confidencePercent / 100} className="mt-1" />
+                </span>
+              </Link>
+            </li>
+          ))}
         </ul>
       )}
     </section>

@@ -14,16 +14,16 @@ export const translations = {
       languages: "Languages",
     },
     home: {
-      liveTrainsBadge: "{count} trains moving right now",
+      liveTrainsBadge: "{count} trains in the published timetable",
       heroTitle: "Live train status, forecasted to arrival",
       heroDescription:
-        "Follow real-time GPS positions across the Indian Railways network, read model-predicted arrival times with confidence, see the likely cause of every delay and watch station boards update as trains arrive.",
-      featuresHeading: "Everything on one radar",
+        "Look up running status from the Indian Railways timetable, read predicted arrivals with a confidence window, see a classified delay cause, and open station boards as trains are due.",
+      featuresHeading: "Timetable, forecast and control room on one desk",
       featuresSubheading:
-        "ETA forecasting, delay intelligence and raw data endpoints, built on the same live feed.",
+        "ETA forecasting, delay tags and JSON endpoints, all built on the same ingested corpus.",
       apiHeading: "Predicted ETA and delay data behind one REST API",
       apiSubheading:
-        "Predicted arrival times with confidence windows, classified delay causes, live running status, timetables and dense GeoJSON route geometry. Start on a free sandbox with 1,000 requests a month.",
+        "Predicted arrivals with confidence windows, classified delay causes, running status, timetables and halt coordinates. Open the developer page for the live endpoint list.",
       devSandbox: "Developer Sandbox",
       openApiSchema: "OpenAPI Schema",
       forDevelopers: "For developers",
@@ -36,11 +36,11 @@ export const translations = {
         "Select a station to view live arrivals, departures, and platform assignments.",
       faqHeading: "Frequently asked questions",
       footerDisclaimer:
-        "An independent transit technology project. Not affiliated with the Ministry of Railways, IRCTC or Indian Railways. Timings shown are estimates derived from crowdsourced telemetry.",
+        "An independent transit technology project. Not affiliated with the Ministry of Railways, IRCTC or Indian Railways. Times shown are estimates from the published timetable plus the ETA model.",
     },
     search: {
       liveNetworkMap: "Live network map",
-      liveNetworkMapSub: "Real-time GPS positions across Indian Railways",
+      liveNetworkMapSub: "Mapped positions from the ingested Indian Railways timetable",
       open: "Open",
       trainsBetween: "Trains between stations",
       fromStation: "From station (e.g. NDLS)",
@@ -61,7 +61,7 @@ export const translations = {
       stationBoardTitle: "Live Station Board",
       stationBoardSub: "Arrivals, departures, and platform assignments",
       developerApiTitle: "Developer REST API",
-      developerApiSub: "Live API sandbox, OpenAPI docs, and SDK snippets",
+      developerApiSub: "Interactive API console and OpenAPI-style endpoint list",
     },
     trainList: {
       runningNow: "Trains running now",
@@ -189,7 +189,7 @@ export const translations = {
         "ईटीए पूर्वानुमान, देरी विश्लेषण और डेवलपर डेटा, सभी एक ही लाइव डेटा स्ट्रीम पर आधारित।",
       apiHeading: "एक ही REST API पर अनुमानित ETA और देरी का डेटा",
       apiSubheading:
-        "कॉन्फिडेंस विंडो के साथ अनुमानित समय, देरी के सटीक कारण, लाइव स्थिति, टाइमटेबल और जियो-रूट। प्रति माह 1,000 अनुरोधों के साथ निःशुल्क सैंडबॉक्स शुरू करें।",
+        "कॉन्फिडेंस विंडो के साथ अनुमानित समय, देरी के कारण, चालू स्थिति, टाइमटेबल और स्टेशन निर्देशांक। डेवलपर पृष्ठ पर लाइव एंडपॉइंट सूची देखें।",
       devSandbox: "डेवलपर सैंडबॉक्स",
       openApiSchema: "ओपनएपीआई स्कीमा",
       forDevelopers: "डेवलपर्स के लिए",
@@ -353,7 +353,7 @@ export const translations = {
       featuresSubheading: "ইটিএ পূর্বাভাস, দেরির কারণ এবং ডেভেলপার ডেটা একই লাইভ ফিডে তৈরি।",
       apiHeading: "একটি মাত্র REST API-এর মাধ্যমে পূর্বাভাসের ডেটা",
       apiSubheading:
-        "সঠিক আগমনের সময়, দেরির কারণ, লাইভ চলমান অবস্থা এবং জিওজেসন রুট জ্যামিতি পান। প্রতি মাসে ১,০০০টি অনুরোধের সাথে বিনামূল্যে স্যান্ডবক্স শুরু করুন।",
+        "সঠিক আগমনের সময়, দেরির কারণ, চলমান অবস্থা, টাইমটেবল এবং স্টেশন স্থানাঙ্ক পান। লাইভ এন্ডপয়েন্ট তালিকার জন্য ডেভেলপার পৃষ্ঠা খুলুন।",
       devSandbox: "ডেভেলপার স্যান্ডবক্স",
       openApiSchema: "OpenAPI স্কিমা",
       forDevelopers: "ডেভেলপারদের জন্য",

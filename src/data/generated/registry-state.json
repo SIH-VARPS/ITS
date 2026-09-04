@@ -1,0 +1,13 @@
+{
+  "champion": {
+    "version": "1.0.0",
+    "artifactPath": "src/data/generated/model.json",
+    "metrics": {
+      "maeMin": 13.827335696555485,
+      "medaeMin": 7.203758521584181,
+      "rmseMin": 26.446688745103316,
+      "p80Coverage": 0.800606394707828
+    }
+  },
+  "previous": null
+}

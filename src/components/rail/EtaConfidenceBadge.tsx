@@ -12,7 +12,7 @@ export function EtaConfidenceBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border border-border bg-secondary/50 px-1.5 py-0.5 text-[10px] font-semibold",
+        "inline-flex items-center gap-1 rounded-full border border-border bg-secondary/50 px-1.5 py-0.5 text-xs font-semibold",
         tier.tone,
         className,
       )}

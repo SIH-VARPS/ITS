@@ -1,5 +1,5 @@
 import { type DelayReason, classifyDelay, DELAY_REASONS } from "./delayReasons";
-import type { TrainRoute, Halt } from "@/data/trains";
+import type { TrainRoute } from "@/data/trains";
 import { trainDelayStats } from "@/data/generated/delayStats";
 import { trainRunHistory } from "@/data/generated/runHistory";
 
@@ -214,14 +214,8 @@ export function buildFeatures(
   const date = state.date;
   const dayOfWeek = date.getDay();
   const timeOfDayHours = state.elapsedMin / 60;
-
-  // Deterministic per-train weather/congestion so the demo is stable between renders.
-  const wSeed = hash(`${train.number}:${state.lastHaltIndex}-${state.date.getDate()}`);
-  const wTable: WeatherCondition[] = ["clear", "clear", "clear", "clear", "rain", "fog", "wind"];
-  const weatherSel = weather ?? wTable[Math.floor(wSeed * wTable.length)] ?? "clear";
-  const congestion =
-    corridorCongestion ??
-    0.2 + hash(`${train.name}:${state.lastHaltIndex}-${state.date.getDate()}`) * 0.6;
+  const weatherSel = weather ?? "clear";
+  const congestion = corridorCongestion ?? 0;
 
   return {
     trainNumber: train.number,
@@ -265,12 +259,6 @@ export function forecastEtaAtHalt(
   delayAtTarget.lowerEta = fmtClock(etaMin - delayAtTarget.intervalMin);
   delayAtTarget.upperEta = fmtClock(etaMin + delayAtTarget.intervalMin);
   return delayAtTarget;
-}
-
-function hash(s: string) {
-  let x = 0;
-  for (let i = 0; i < s.length; i++) x = (x * 31 + s.charCodeAt(i)) % 100000;
-  return (x % 1000) / 1000;
 }
 
 /** Median of a numeric array (robust central tendency for run delays). */

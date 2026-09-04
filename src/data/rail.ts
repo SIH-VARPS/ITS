@@ -11,57 +11,6 @@ export type Train = {
   type: string;
 };
 
-export const liveTrains: Train[] = [
-  {
-    number: "22439",
-    name: "Vande Bharat Express",
-    from: "NDLS",
-    to: "SVDK",
-    speed: 128,
-    delay: 0,
-    nextStation: "Ambala Cantt (UMB)",
-    eta: "14:22",
-    progress: 42,
-    type: "Vande Bharat",
-  },
-  {
-    number: "12951",
-    name: "Mumbai Rajdhani",
-    from: "MMCT",
-    to: "NDLS",
-    speed: 96,
-    delay: 18,
-    nextStation: "Kota Junction (KOTA)",
-    eta: "21:05",
-    progress: 61,
-    type: "Rajdhani",
-  },
-  {
-    number: "12259",
-    name: "Sealdah Duronto",
-    from: "SDAH",
-    to: "NDLS",
-    speed: 0,
-    delay: 47,
-    nextStation: "Kanpur Central (CNB)",
-    eta: "05:48",
-    progress: 74,
-    type: "Duronto",
-  },
-  {
-    number: "12009",
-    name: "Shatabdi Express",
-    from: "MMCT",
-    to: "ADI",
-    speed: 110,
-    delay: 4,
-    nextStation: "Surat (ST)",
-    eta: "09:31",
-    progress: 28,
-    type: "Shatabdi",
-  },
-];
-
 export const quickServices = [
   {
     title: "Station Board",
@@ -77,45 +26,29 @@ export const quickServices = [
 
 export const features = [
   {
-    title: "Live GPS + ETA forecast",
-    body: "Follow every running train on a moving map with live speed and a model-predicted arrival time, not just a raw position.",
+    title: "Schedule-backed ETA",
+    body: "Every arrival starts from the published timetable, then applies the current delay and remaining slack so the number you see is a forecast, not a copied clock.",
   },
   {
-    title: "Model-driven predictions",
-    body: "Every ETA carries a confidence score and a window, so staff can plan around real forecast uncertainty.",
+    title: "Delay window, not a single guess",
+    body: "When the model runs it also reports a confidence score and an arrival window, so a control room can plan around uncertainty instead of a false precision.",
   },
   {
-    title: "Delay cause detection",
-    body: "Each late train is tagged with a classified cause — weather, congestion, track work, signal or technical.",
+    title: "Delay cause tags",
+    body: "Late trains are labelled with a classified cause — weather, congestion, track work, signal or technical — derived from the same feature vector as the ETA.",
   },
   {
     title: "Control-room dashboard",
-    body: "A network-wide view of running trains, active delay alerts and the cause breakdown for operations staff.",
+    body: "A monitored-subset view of running trains, active delay alerts and the cause breakdown for operations staff.",
   },
   {
     title: "Trains between stations",
-    body: "Every service linking two stations, with route-scoped halts and running days.",
+    body: "Direct services linking two stations, with halt order and running days taken from the ingested timetable.",
   },
   {
     title: "Developer REST API",
-    body: "Predicted ETA, delay causes, confidence intervals and GeoJSON route geometry behind a single documented endpoint.",
+    body: "Predicted ETA, delay causes, confidence intervals, station boards and timetables on documented JSON endpoints.",
   },
-];
-
-export const networks = [
-  { name: "Vande Bharat", active: 124 },
-  { name: "Rajdhani", active: 70 },
-  { name: "Shatabdi", active: 44 },
-  { name: "Jan Shatabdi", active: 56 },
-  { name: "Duronto", active: 48 },
-  { name: "Garib Rath", active: 52 },
-];
-
-export const locals = [
-  { city: "Mumbai", active: 3141 },
-  { city: "Kolkata", active: 1520 },
-  { city: "Chennai", active: 819 },
-  { city: "Hyderabad", active: 88 },
 ];
 
 export const stations = [
@@ -144,7 +77,7 @@ export const faqs = [
   },
   {
     q: "How are arrival times predicted?",
-    a: "The ETA model combines the current delay, historical drift at earlier halts, weather, corridor congestion and time of day. Every prediction carries a confidence score and an expected window instead of a single optimistic number.",
+    a: "The baseline is the published arrival plus the current delay minus remaining schedule slack. The ETA model then layers historical halt drift, corridor congestion and time of day, and reports a confidence window instead of a single optimistic number.",
   },
   {
     q: "Why are some trains showing a delay cause?",
@@ -156,6 +89,6 @@ export const faqs = [
   },
   {
     q: "Can I use the data in my own product?",
-    a: "Yes. The REST API exposes predicted ETA, delay causes, confidence intervals, live positions, timetables and route geometry, with a free sandbox tier for evaluation.",
+    a: "Yes. The REST API exposes predicted ETA, delay causes, confidence intervals, live positions, timetables and halt coordinates. Open the developer page for the current endpoint list — there is no advertised monthly quota until a limiter is actually wired up.",
   },
 ];

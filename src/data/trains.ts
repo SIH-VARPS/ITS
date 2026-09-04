@@ -1,20 +1,25 @@
-import { trainRoutes as generatedRoutes } from "./generated/routes";
+import type { Halt, TrainRoute, TrainSummary } from "./trainTypes";
+import { featuredRoutes } from "./generated/featured";
+import { catalogTrains, localCounts, networkCounts, ROUTE_COUNT } from "./generated/catalog";
 
-export type { Halt, TrainRoute } from "./trainTypes";
+export type { Halt, TrainRoute, TrainSummary };
+export { localCounts, networkCounts, ROUTE_COUNT, catalogTrains };
 
-export const trainRoutes = generatedRoutes;
+/** Spotlight subset (delay-history + hot-set + sample multi-day). Not the full corpus. */
+export const trainRoutes = featuredRoutes;
 
-export function findTrains(query: string): (typeof trainRoutes)[number][] {
+export function findTrains(query: string): TrainSummary[] {
   const q = query.trim().toLowerCase();
-  if (!q) return trainRoutes;
-  return trainRoutes.filter(
+  if (!q) return catalogTrains.slice(0, 20);
+  return catalogTrains.filter(
     (t) =>
-      t.number.includes(q) ||
+      t.number.toLowerCase().includes(q) ||
       t.name.toLowerCase().includes(q) ||
-      t.halts.some((s) => s.code.toLowerCase() === q || s.name.toLowerCase().includes(q)),
+      t.origin.toLowerCase() === q ||
+      t.destination.toLowerCase() === q,
   );
 }
 
-export function getTrain(number: string) {
-  return trainRoutes.find((t) => t.number === number);
+export function getTrain(number: string): TrainRoute | undefined {
+  return featuredRoutes.find((t) => t.number === number);
 }

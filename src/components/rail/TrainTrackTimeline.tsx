@@ -310,7 +310,7 @@ export function TrainTrackTimeline({
                 <span
                   className={`block font-mono ${
                     isIntermediate
-                      ? "text-[10px] text-muted-foreground/80 font-medium"
+                      ? "text-[10px] text-muted-foreground font-medium"
                       : "text-[11px] font-semibold"
                   } ${
                     isDelayed
@@ -432,7 +432,7 @@ export function TrainTrackTimeline({
                 )}
               </div>
 
-              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[9.5px] text-muted-foreground/80">
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[9.5px] text-muted-foreground">
                 <span
                   className={`font-mono ${isIntermediate ? "text-muted-foreground/70" : "font-semibold text-foreground/80"}`}
                 >
@@ -469,7 +469,7 @@ export function TrainTrackTimeline({
                 <span
                   className={`block font-mono ${
                     isIntermediate
-                      ? "text-[10px] text-muted-foreground/80 font-medium"
+                      ? "text-[10px] text-muted-foreground font-medium"
                       : "text-[11px] font-semibold"
                   } ${
                     isDelayed
@@ -505,7 +505,7 @@ export function TrainTrackTimeline({
         {showEnRouteAfterThis && (
           <div className="grid grid-cols-[65px_minmax(0,1fr)_65px] sm:grid-cols-[85px_minmax(0,1fr)_85px] items-stretch min-h-[56px] px-3 bg-primary/5 border-y border-primary/15">
             <div className="flex items-center justify-center text-center">
-              <span className="font-mono text-[10px] text-primary/80 font-bold">
+              <span className="font-mono text-[10px] text-primary font-bold">
                 {status.speed} km/h
               </span>
             </div>
@@ -551,7 +551,7 @@ export function TrainTrackTimeline({
             </div>
 
             <div className="flex items-center justify-center text-right pr-1">
-              <span className="font-mono text-[10px] text-primary/80 font-bold">
+              <span className="font-mono text-[10px] text-primary font-bold">
                 ETA {status.etaNext}
               </span>
             </div>
@@ -725,7 +725,7 @@ export function TrainTrackTimeline({
               <div className="grid grid-cols-[65px_minmax(0,1fr)_65px] sm:grid-cols-[85px_minmax(0,1fr)_85px] items-stretch min-h-[46px] px-3 bg-secondary/30 transition-colors hover:bg-secondary/50">
                 {/* Left Column */}
                 <div className="flex items-center justify-center text-center">
-                  <span className="text-[10px] font-mono text-muted-foreground/75">
+                  <span className="text-[10px] font-mono text-muted-foreground">
                     {distanceDiff > 0 ? `+${distanceDiff} km` : ""}
                   </span>
                 </div>
@@ -777,9 +777,7 @@ export function TrainTrackTimeline({
 
                 {/* Right Column */}
                 <div className="flex items-center justify-center text-right pr-1">
-                  <span className="text-[10px] text-muted-foreground/75 font-mono">
-                    {count} stops
-                  </span>
+                  <span className="text-[10px] text-muted-foreground font-mono">{count} stops</span>
                 </div>
               </div>
             </div>

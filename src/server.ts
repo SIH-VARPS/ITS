@@ -1,8 +1,11 @@
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
+import { initServerErrorTracking } from "./lib/errorTracking";
 import { renderErrorPage } from "./lib/error-page";
 import { handleApiRequest } from "./server/apiRouter";
+
+initServerErrorTracking();
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;

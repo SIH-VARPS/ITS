@@ -1,11 +1,10 @@
 import type { Halt, TrainRoute } from "@/data/trains";
 import type { DelayReason } from "./delayReasons";
-import {
-  type DelayForecast,
-  buildFeatures,
-  forecastEtaAtHalt,
-  historicalDelayAt,
-} from "./etaModel";
+import { historicalDelayAt, type DelayForecast } from "./etaModel";
+import { etaAtHalt, type LiveEngineState } from "./etaEngine";
+
+/** Future halts scored eagerly on every live-status tick. The rest stay lazy. */
+export const EAGER_AHEAD_HALTS = 3;
 
 export type LiveStatus = {
   /** minutes late */
@@ -28,6 +27,8 @@ export type LiveStatus = {
   /** overall forecast confidence 0..1 */
   confidence: number;
   updatedAt: number;
+  /** Engine vector so far-halt forecasts can be materialized without rescoring the clock. */
+  engineLive: LiveEngineState;
   haltStatus: {
     halt: Halt;
     scheduled: string;
@@ -115,21 +116,23 @@ export function computeLiveStatus(train: TrainRoute, now: Date): LiveStatus {
   const forecast =
     state === "not-started"
       ? null
-      : forecastEtaAtHalt(train, Math.min(forecastTarget, train.halts.length - 1), liveState, now);
+      : etaAtHalt(train, Math.min(forecastTarget, train.halts.length - 1), liveState, now).ui;
 
   const reason = forecast ? forecast.reason : "unknown";
 
   const haltStatus = train.halts.map((halt, i) => {
-    const haltForecast =
-      state === "not-started"
-        ? null
-        : forecastEtaAtHalt(train, Math.min(i, train.halts.length - 1), liveState, now);
+    const done = state === "completed" || (state !== "not-started" && halt.arr <= clamped);
+    const eager =
+      state !== "not-started" && !done && i > lastIdx && i <= lastIdx + EAGER_AHEAD_HALTS;
+    const haltForecast = eager
+      ? etaAtHalt(train, Math.min(i, train.halts.length - 1), liveState, now).ui
+      : null;
     return {
       halt,
       scheduled: fmtMinutes(train.startsAt + halt.arr),
       expected: fmtMinutes(train.startsAt + halt.arr + (i === 0 ? 0 : delay)),
       forecast: haltForecast,
-      done: state === "completed" || (state !== "not-started" && halt.arr <= clamped),
+      done,
       isNext: nextHalt ? halt.code === nextHalt.code && i === lastIdx + 1 : false,
     };
   });
@@ -151,8 +154,23 @@ export function computeLiveStatus(train: TrainRoute, now: Date): LiveStatus {
     delayReason: reason,
     confidence: forecast?.confidence ?? 0,
     updatedAt: now.getTime(),
+    engineLive: liveState,
     haltStatus,
   };
+}
+
+/** Fill a halt that was left lazy by {@link computeLiveStatus}. */
+export function materializeHaltForecast(
+  train: TrainRoute,
+  status: LiveStatus,
+  haltIndex: number,
+  now: Date,
+): DelayForecast | null {
+  if (status.state === "not-started") return null;
+  const existing = status.haltStatus[haltIndex]?.forecast;
+  if (existing) return existing;
+  if (haltIndex < 0 || haltIndex >= train.halts.length) return null;
+  return etaAtHalt(train, haltIndex, status.engineLive, now).ui;
 }
 
 export function delayLabel(status: LiveStatus) {

@@ -1,0 +1,50 @@
+name: Retrain ETA model
+
+# Nightly challenger fit on the accumulated corpus. Does not overwrite the
+# serving champion — promotion is `npm run model:promote` (MAE margin + calibration).
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          pip install -r ml/requirements.txt
+
+      - name: Generate training corpus
+        run: node scripts/generate-training-data.mjs
+
+      - name: Fit challenger
+        run: python ml/retrain.py
+
+      - name: Upload challenger artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-challenger
+          path: |
+            src/data/generated/challenger.json
+            src/data/generated/models/*.json
+            ml/registry/*.json
+          if-no-files-found: error
+          retention-days: 90

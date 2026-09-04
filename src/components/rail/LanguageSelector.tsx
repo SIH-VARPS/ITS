@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useLanguage, SUPPORTED_LANGUAGES, Language, LanguageInfo } from "@/lib/i18n";
+import { useLanguage, SUPPORTED_LANGUAGES, type LanguageInfo } from "@/lib/i18n";
 
 interface LanguageSelectorProps {
   variant?: "header" | "mobile" | "compact";

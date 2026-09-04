@@ -6,7 +6,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { features, networks, locals, stations, faqs } from "@/data/rail";
+import { features, stations, faqs } from "@/data/rail";
+import { localCounts, networkCounts } from "@/data/trains";
 import { useTranslation } from "@/lib/i18n";
 
 export function Features() {
@@ -75,7 +76,7 @@ export function Networks() {
         <div>
           <h2 className="text-xl font-bold">{t("home.premiumNetworks")}</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {networks.map((n) => (
+            {networkCounts.map((n) => (
               <button
                 key={n.name}
                 className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-left shadow-card transition-colors hover:border-primary/40"
@@ -92,7 +93,7 @@ export function Networks() {
         <div>
           <h2 className="text-xl font-bold">{t("home.suburbanLocals")}</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {locals.map((l) => (
+            {localCounts.map((l) => (
               <button
                 key={l.city}
                 className="rounded-xl border border-border bg-card px-4 py-3 text-left shadow-card transition-colors hover:border-primary/40"

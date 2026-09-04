@@ -12,6 +12,7 @@ import {
   SiteFooter,
 } from "@/components/rail/Sections";
 import { useTranslation } from "@/lib/i18n";
+import { ROUTE_COUNT } from "@/data/trains";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Track Indian Railways trains live on a GPS map, see model-predicted arrival times with confidence, delay causes and a control-room dashboard.",
+          "Look up Indian Railways trains from the published timetable, read predicted arrival times with confidence, delay causes and a control-room dashboard.",
       },
       {
         property: "og:title",
@@ -30,7 +31,7 @@ export const Route = createFileRoute("/")({
       {
         property: "og:description",
         content:
-          "Live GPS train tracking with predicted ETA, delay cause detection and a control-room view for Indian Railways.",
+          "Timetable-backed train tracking with predicted ETA, delay cause tags and a control-room view for Indian Railways.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -51,7 +52,7 @@ function Index() {
             <div className="order-2 lg:order-1">
               <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-muted-foreground shadow-card">
                 <span className="size-1.5 rounded-full bg-rail-live animate-rail-pulse" />
-                {t("home.liveTrainsBadge", { count: "12,480" })}
+                {t("home.liveTrainsBadge", { count: ROUTE_COUNT.toLocaleString("en-IN") })}
               </span>
               <h1 className="mt-5 text-4xl font-bold leading-[1.05] sm:text-5xl">
                 {t("home.heroTitle")}

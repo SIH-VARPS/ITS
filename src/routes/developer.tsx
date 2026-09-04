@@ -1,19 +1,6 @@
 import { useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  Code,
-  Terminal,
-  Play,
-  Copy,
-  Check,
-  Globe,
-  Database,
-  Sparkles,
-  Zap,
-  ArrowRight,
-  Clock,
-  CheckCircle2,
-} from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { Code, Terminal, Play, Copy, Check, Database, Sparkles, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { SiteHeader } from "@/components/rail/SiteHeader";
 import { SiteFooter } from "@/components/rail/Sections";
@@ -29,7 +16,7 @@ export const Route = createFileRoute("/developer")({
       {
         name: "description",
         content:
-          "Integrate real-time train tracking, ETA forecasts, delay classification, station boards, and PNR status into your applications with our high-speed REST API.",
+          "Integrate train tracking, ETA forecasts, delay classification, station boards, and PNR status into your applications with the REST API.",
       },
     ],
   }),
@@ -62,7 +49,7 @@ const ENDPOINTS: ApiEndpoint[] = [
     method: "GET",
     path: "/api/v1/train/12951/live",
     description:
-      "Real-time GPS coordinates, speed, next scheduled halt, predicted ETA with confidence windows, and delay reason.",
+      "Predicted coordinates, speed, next scheduled halt, predicted ETA with confidence windows, and delay reason.",
     category: "Tracking",
   },
   {
@@ -299,8 +286,8 @@ print(data)`;
                   <span className="font-semibold text-rail-live">Enabled (*)</span>
                 </li>
                 <li className="flex justify-between">
-                  <span className="text-muted-foreground">Rate Limit</span>
-                  <span className="font-semibold">1,000 req/min</span>
+                  <span className="text-muted-foreground">Rate limit</span>
+                  <span className="font-semibold">Not advertised</span>
                 </li>
                 <li className="flex justify-between">
                   <span className="text-muted-foreground">Format</span>

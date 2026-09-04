@@ -1,0 +1,16 @@
+{
+  "tier": "free",
+  "note": "Long-distance, multi-halt, historically delayed. Cap at 10 on the free quota.",
+  "trains": [
+    "12951",
+    "12953",
+    "12301",
+    "12259",
+    "12631",
+    "12313",
+    "12957",
+    "12163",
+    "12001",
+    "12305"
+  ]
+}

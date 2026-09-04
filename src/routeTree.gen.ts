@@ -14,7 +14,9 @@ import { Route as ConnectingImpactRouteImport } from './routes/connecting-impact
 import { Route as ControlRoomRouteImport } from './routes/control-room'
 import { Route as DeveloperRouteImport } from './routes/developer'
 import { Route as NetworkRouteImport } from './routes/network'
+import { Route as OpsRouteImport } from './routes/ops'
 import { Route as PnrRouteImport } from './routes/pnr'
+import { Route as DisplayCodeRouteImport } from './routes/display.$code'
 import { Route as StationCodeRouteImport } from './routes/station.$code'
 import { Route as TrainNumberRouteImport } from './routes/train.$number'
 
@@ -43,9 +45,19 @@ const NetworkRoute = NetworkRouteImport.update({
   path: '/network',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OpsRoute = OpsRouteImport.update({
+  id: '/ops',
+  path: '/ops',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PnrRoute = PnrRouteImport.update({
   id: '/pnr',
   path: '/pnr',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DisplayCodeRoute = DisplayCodeRouteImport.update({
+  id: '/display/$code',
+  path: '/display/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StationCodeRoute = StationCodeRouteImport.update({
@@ -65,7 +77,9 @@ export interface FileRoutesByFullPath {
   '/control-room': typeof ControlRoomRoute
   '/developer': typeof DeveloperRoute
   '/network': typeof NetworkRoute
+  '/ops': typeof OpsRoute
   '/pnr': typeof PnrRoute
+  '/display/$code': typeof DisplayCodeRoute
   '/station/$code': typeof StationCodeRoute
   '/train/$number': typeof TrainNumberRoute
 }
@@ -75,7 +89,9 @@ export interface FileRoutesByTo {
   '/control-room': typeof ControlRoomRoute
   '/developer': typeof DeveloperRoute
   '/network': typeof NetworkRoute
+  '/ops': typeof OpsRoute
   '/pnr': typeof PnrRoute
+  '/display/$code': typeof DisplayCodeRoute
   '/station/$code': typeof StationCodeRoute
   '/train/$number': typeof TrainNumberRoute
 }
@@ -86,7 +102,9 @@ export interface FileRoutesById {
   '/control-room': typeof ControlRoomRoute
   '/developer': typeof DeveloperRoute
   '/network': typeof NetworkRoute
+  '/ops': typeof OpsRoute
   '/pnr': typeof PnrRoute
+  '/display/$code': typeof DisplayCodeRoute
   '/station/$code': typeof StationCodeRoute
   '/train/$number': typeof TrainNumberRoute
 }
@@ -98,7 +116,9 @@ export interface FileRouteTypes {
     | '/control-room'
     | '/developer'
     | '/network'
+    | '/ops'
     | '/pnr'
+    | '/display/$code'
     | '/station/$code'
     | '/train/$number'
   fileRoutesByTo: FileRoutesByTo
@@ -108,7 +128,9 @@ export interface FileRouteTypes {
     | '/control-room'
     | '/developer'
     | '/network'
+    | '/ops'
     | '/pnr'
+    | '/display/$code'
     | '/station/$code'
     | '/train/$number'
   id:
@@ -118,7 +140,9 @@ export interface FileRouteTypes {
     | '/control-room'
     | '/developer'
     | '/network'
+    | '/ops'
     | '/pnr'
+    | '/display/$code'
     | '/station/$code'
     | '/train/$number'
   fileRoutesById: FileRoutesById
@@ -129,7 +153,9 @@ export interface RootRouteChildren {
   ControlRoomRoute: typeof ControlRoomRoute
   DeveloperRoute: typeof DeveloperRoute
   NetworkRoute: typeof NetworkRoute
+  OpsRoute: typeof OpsRoute
   PnrRoute: typeof PnrRoute
+  DisplayCodeRoute: typeof DisplayCodeRoute
   StationCodeRoute: typeof StationCodeRoute
   TrainNumberRoute: typeof TrainNumberRoute
 }
@@ -171,11 +197,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NetworkRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ops': {
+      id: '/ops'
+      path: '/ops'
+      fullPath: '/ops'
+      preLoaderRoute: typeof OpsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pnr': {
       id: '/pnr'
       path: '/pnr'
       fullPath: '/pnr'
       preLoaderRoute: typeof PnrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/display/$code': {
+      id: '/display/$code'
+      path: '/display/$code'
+      fullPath: '/display/$code'
+      preLoaderRoute: typeof DisplayCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/station/$code': {
@@ -201,7 +241,9 @@ const rootRouteChildren: RootRouteChildren = {
   ControlRoomRoute: ControlRoomRoute,
   DeveloperRoute: DeveloperRoute,
   NetworkRoute: NetworkRoute,
+  OpsRoute: OpsRoute,
   PnrRoute: PnrRoute,
+  DisplayCodeRoute: DisplayCodeRoute,
   StationCodeRoute: StationCodeRoute,
   TrainNumberRoute: TrainNumberRoute,
 }

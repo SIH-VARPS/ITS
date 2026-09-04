@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import type { TrainRoute, Halt } from "@/data/trains";
+import type { TrainRoute } from "@/data/trains";
 import type { LiveStatus } from "@/lib/liveStatus";
 import type { DelayForecast } from "@/lib/etaModel";
 import { fmtMinutes } from "@/lib/liveStatus";
@@ -71,6 +71,14 @@ function computeGpsStatus(train: TrainRoute, gps: GpsLocation): LiveStatus {
 
   const nextHalt = isLast ? null : halts[closestHaltIdx + 1]!;
   const nextArrMin = train.startsAt + (nextHalt?.arr ?? closestHalt.arr);
+  const engineLive = {
+    elapsedMin: 0,
+    currentDelayMin: 0,
+    currentKm: currentKm,
+    lastHaltIndex: closestHaltIdx,
+    haltedDurationMin: state === "halted" ? 5 : 0,
+    isHalted: state === "halted",
+  };
 
   const haltStatus = halts.map((h, idx) => {
     const isDone = idx < closestHaltIdx;
@@ -102,16 +110,19 @@ function computeGpsStatus(train: TrainRoute, gps: GpsLocation): LiveStatus {
     haltStatus,
     updatedAt: gps.timestamp,
     forecast: createForecast(nextArrMin),
+    engineLive,
   };
 }
 
-export function useOnBoardGps(train: TrainRoute) {
+export function useOnBoardGps(train: TrainRoute, options: { consent?: boolean } = {}) {
+  const consent = options.consent === true;
   const [isActive, setIsActive] = useState(false);
   const [location, setLocation] = useState<GpsLocation | null>(null);
   const [isOnBoard, setIsOnBoard] = useState(false);
   const [distanceToRouteKm, setDistanceToRouteKm] = useState<number | null>(null);
   const [gpsStatus, setGpsStatus] = useState<LiveStatus | null>(null);
   const watchIdRef = useRef<number | null>(null);
+  const lastPostedAt = useRef(0);
 
   const stopWatching = useCallback(() => {
     if (watchIdRef.current !== null && typeof navigator !== "undefined" && navigator.geolocation) {
@@ -150,6 +161,23 @@ export function useOnBoardGps(train: TrainRoute) {
         const live = computeGpsStatus(train, gps);
         setGpsStatus(live);
         toast.success(`Connected to On-Board GPS! Train location synced to your device.`);
+        if (consent && Date.now() - lastPostedAt.current >= 20_000) {
+          lastPostedAt.current = Date.now();
+          void fetch("/api/v2/observations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              trainNo: train.number,
+              lat: gps.lat,
+              lng: gps.lng,
+              recordedAt: gps.timestamp,
+              consent: true,
+              accuracyM: gps.accuracy,
+            }),
+          }).catch(() => {
+            /* intake is best-effort */
+          });
+        }
       } else {
         setIsOnBoard(false);
         // Compute status snapping to closest halt but inform the user
@@ -160,7 +188,7 @@ export function useOnBoardGps(train: TrainRoute) {
         );
       }
     },
-    [train],
+    [train, consent],
   );
 
   const toggleGps = useCallback(() => {

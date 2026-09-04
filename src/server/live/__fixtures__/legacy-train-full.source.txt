@@ -1,0 +1,3 @@
+source: railradar-live
+endpoint: GET /v1/legacy/trains/12951?dataType=full
+note: Checked in verbatim from a live response. Do not hand-edit.

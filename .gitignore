@@ -16,6 +16,34 @@ dist-ssr
 .nitro
 *.local
 
+# Secrets — never commit. Server-side keys live in .env / hosting env only.
+.env
+.env.*
+!.env.example
+
+# Harvest corpus (append-only JSONL). Keep the directory, drop the data.
+data/harvest/**
+!data/harvest/.gitkeep
+
+# ML training rows (regenerated). Keep model.json + fixtures in src/.
+ml/data/**
+!ml/data/.gitkeep
+ml/**/__pycache__/
+ml/registry/**
+!ml/registry/.gitkeep
+
+# Challenger artifacts. Champion stays src/data/generated/model.json until promotion.
+src/data/generated/challenger.json
+src/data/generated/models/**
+!src/data/generated/models/.gitkeep
+
+# Test / coverage artefacts
+coverage
+playwright-report
+test-results
+blob-report
+playwright/.cache
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

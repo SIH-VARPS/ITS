@@ -12,7 +12,7 @@ export const Route = createFileRoute("/network")({
       { title: "Live network map — ITS Indian Train System" },
       {
         name: "description",
-        content: "See every tracked train across the Indian Railways network on one live GPS map.",
+        content: "See tracked trains across the Indian Railways network on one map.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

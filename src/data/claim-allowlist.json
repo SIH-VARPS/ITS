@@ -1,0 +1,20 @@
+{
+  "description": "UI strings may mention numbers only when interpolated at runtime ({count}) or when they are identifiers (sample PNRs, train numbers), not capability claims. Forbidden substrings must not appear in scanned files.",
+  "scanGlobs": [
+    "src/routes/**/*.tsx",
+    "src/components/rail/**/*.tsx",
+    "src/data/rail.ts",
+    "src/data/translations.ts"
+  ],
+  "forbiddenSubstrings": [
+    "12,480",
+    "12480",
+    "1,000 requests",
+    "1000 requests",
+    "1,000 req/min",
+    "90-day rolling",
+    "high-density GeoJSON",
+    "dense GeoJSON",
+    "free sandbox"
+  ]
+}

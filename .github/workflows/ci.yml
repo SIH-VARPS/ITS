@@ -24,10 +24,31 @@ jobs:
         run: npm ci
 
       - name: Check code formatting
-        run: npm run format -- --check
+        run: npm run format:check
 
       - name: Lint codebase
         run: npm run lint
 
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests with coverage
+        run: npm run test:cov
+
       - name: Build production bundle
         run: npm run build
+
+      - name: Client bundle budget and secret scan
+        run: npm run check:bundle
+
+      - name: ETA scoring bench
+        run: npm run bench
+
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: npm run test:e2e
