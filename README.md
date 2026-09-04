@@ -8,6 +8,22 @@ passenger page, station boards, the control room, and `/api/v2`.
 
 Not a substitute for NTES or control-office running orders.
 
+## Contents
+
+- [What you can open](#what-you-can-open)
+- [Architecture at a glance](#architecture-at-a-glance)
+- [How a forecast is made](#how-a-forecast-is-made)
+- [Request flow: one ETA, three screens](#request-flow-one-eta-three-screens)
+- [Tiered live feed](#tiered-live-feed)
+- [Training and continuous refinement](#training-and-continuous-refinement)
+- [Project structure](#project-structure)
+- [Quick start](#quick-start)
+- [Environment](#environment)
+- [API](#api)
+- [Commands](#commands)
+- [Tests that matter](#tests-that-matter)
+- [Docs](#docs)
+
 ## What you can open
 
 | URL             | What it is                                                                |
@@ -22,6 +38,58 @@ Not a substitute for NTES or control-office running orders.
 
 Try train **12951** and station **NDLS** first — they are the demo fixtures.
 
+## Architecture at a glance
+
+```mermaid
+flowchart LR
+    subgraph Surfaces["Consumers"]
+        Passenger["/train/:number\npassenger view"]
+        Display["/display/:code\nstation board"]
+        Control["/control-room\nspotlight + cascade"]
+        ThirdParty["Mobile apps / partners\nvia /api/v2"]
+    end
+
+    subgraph API["TanStack Start server · src/server"]
+        Router["apiRouter.ts\n/api/v2/*"]
+        RateLimit["Rate limiter + CORS"]
+    end
+
+    subgraph Engine["Forecast core · src/lib"]
+        EtaEngine["EtaEngine\n(etaEngine.ts)"]
+        Features["Section features\n(weather, occupancy,\ndelay history, TSR)"]
+        Tree["treeEnsemble.ts\nquantile trees"]
+        Fallback["etaModel.ts\nheuristic fallback"]
+    end
+
+    subgraph Live["Live feed · src/server/live"]
+        Tiered["TieredLiveFeed"]
+        RailRadar["RailRadarAdapter\n(Tier A)"]
+        Crowd["CrowdGpsAdapter\n(Tier B)"]
+        Replay["ReplayAdapter\n(Tier C)"]
+    end
+
+    subgraph Data["Data · src/data + eval + ml"]
+        Timetable["generated/*.json\n~11,113 trains"]
+        Model["model.json\nchampion artifact"]
+        Report["eval/report.json\nsynthetic + real"]
+    end
+
+    Passenger --> Router
+    Display --> Router
+    Control --> Router
+    ThirdParty --> Router
+    Router --> RateLimit --> EtaEngine
+    EtaEngine --> Features --> Tree
+    EtaEngine -.artifact missing.-> Fallback
+    EtaEngine --> Tiered
+    Tiered --> RailRadar
+    Tiered --> Crowd
+    Tiered --> Replay
+    EtaEngine --> Timetable
+    Tree --> Model
+    Model --> Report
+```
+
 ## How a forecast is made
 
 1. **Live observation** — RailRadar (Tier A), opt-in crowd GPS (Tier B), or an offline timetable
@@ -34,6 +102,112 @@ Try train **12951** and station **NDLS** first — they are the demo fixtures.
 
 Hot-set trains spend RailRadar quota. The long tail uses the model, delay priors, weather, and
 replay so the demo still works with the network off (`LIVE_FEED_DISABLE_VENDOR=1`).
+
+## Request flow: one ETA, three screens
+
+Every surface calls the same engine through the same API — there is no separate "UI logic" that
+can drift from what `/api/v2/eta` returns.
+
+```mermaid
+sequenceDiagram
+    participant U as Passenger / Display / Control room
+    participant API as GET /api/v2/eta
+    participant Engine as EtaEngine
+    participant Live as TieredLiveFeed
+    participant Model as model.json (quantile trees)
+
+    U->>API: train=12951&station=NDLS
+    API->>Live: fetchTrainDetailed("12951")
+    Live-->>API: observations + source tier
+    API->>Engine: loadEngineContext(train, observations)
+    Engine->>Engine: buildSectionFeatures() per remaining halt
+    Engine->>Model: scoreQuantiles(featureVector)
+    Model-->>Engine: p10 / p50 / p80 / p90 (minutes)
+    Engine-->>API: HaltEta[] (ISO eta, modelVersion, source)
+    API-->>U: same JSON payload, every surface
+
+    Note over U,API: Passenger, display, and control room render\nthe identical data-engine-eta attribute.
+```
+
+## Tiered live feed
+
+`TieredLiveFeed` never lets a vendor outage kill the forecast. It falls back automatically, in
+order, and every response is tagged with which tier answered.
+
+```mermaid
+flowchart TD
+    Start(["fetchTrainDetailed(trainNo)"]) --> Cache{"Cached\n< 60s old?"}
+    Cache -- yes --> Return(["Return cached result"])
+    Cache -- no --> TierA{"Tier A: RailRadar\nkey set? quota left?\ncircuit closed?"}
+    TierA -- yes, call ok --> UseA["source = railradar\nharvest + persist"]
+    TierA -- no / failed 3x --> TierB{"Tier B: crowd GPS\nobservation in store?"}
+    TierB -- yes --> UseB["source = crowd"]
+    TierB -- no --> TierC["Tier C: ReplayAdapter\naccelerated timetable clock"]
+    TierC --> UseC["source = replay"]
+    UseA --> Return
+    UseB --> Return
+    UseC --> Return
+
+    style UseA fill:#065f46,color:#fff
+    style UseB fill:#92400e,color:#fff
+    style UseC fill:#374151,color:#fff
+```
+
+- **Tier A** fails closed: 3 consecutive vendor errors open a circuit breaker; the monthly quota
+  cap refuses the vendor before it is even called.
+- **Tier B** is opt-in only — no GPS observation is stored without `"consent": true`
+  ([docs/DATA_HANDLING.md](docs/DATA_HANDLING.md)).
+- **Tier C** always succeeds — this is what keeps the demo alive with
+  `LIVE_FEED_DISABLE_VENDOR=1` or the network unplugged.
+
+## Training and continuous refinement
+
+Training happens offline in Python; TypeScript only ever reads the exported JSON tree. Promotion
+is gated so a bad retrain cannot ship silently.
+
+```mermaid
+flowchart LR
+    Ingest["npm run ingest\nCSV → timetable shards"] --> Synth["npm run train:data\nsynthetic AR(1) runs"]
+    Harvest["npm run harvest\nRailRadar legacy/full"] --> TrainPy
+    Synth --> TrainPy["python ml/train.py\nquantile GBTs, walk-forward CV"]
+    TrainPy --> Artifact["challenger model.json"]
+    Artifact --> Registry{"ModelRegistry.consider\nMAE improved AND\nP80 calibration OK?"}
+    Registry -- yes --> Promote["npm run model:promote\nchampion pointer swaps"]
+    Registry -- no --> Reject["challenger rejected\nchampion unchanged"]
+    Promote --> Serve["EtaEngine serves champion"]
+    Promote --> Eval["npm run eval\neval/report.json\n(synthetic vs real, never blended)"]
+    Serve -.rollback if needed.-> Rollback["npm run model:rollback"]
+```
+
+See [ADR 0002](docs/adr/0002-python-json-ts.md) for why training is Python and serving is
+TypeScript, and [ADR 0005](docs/adr/0005-champion-challenger.md) for the promotion gate.
+
+## Project structure
+
+```text
+RailDristhi/
+├─ src/
+│  ├─ routes/            # File-based pages (/, /train/$number, /display/$code, ...)
+│  ├─ components/rail/   # ControlRoomDashboard, ModelEvalPanel, CascadePanel, EtaBand, ...
+│  ├─ lib/
+│  │  ├─ etaEngine.ts     # Single serving path — builds features, scores quantiles
+│  │  ├─ etaModel.ts      # Heuristic fallback when the artifact is missing
+│  │  ├─ features/        # weather.ts, sectionFeatures.ts, ist.ts, schema.ts
+│  │  ├─ model/           # treeEnsemble.ts (parity-tested vs Python), loadArtifact.ts
+│  │  ├─ refine/          # registry.ts (champion/challenger), residual.ts, drift.ts
+│  │  └─ eval/            # harness.ts — walk-forward synthetic + real hold-outs
+│  ├─ server/
+│  │  ├─ routes/v2/      # health, eta, events, forecast, board, live, observations, openapi
+│  │  ├─ live/           # adapter.ts (TieredLiveFeed), railRadarAdapter, crowdGpsAdapter, replayAdapter
+│  │  └─ middleware/     # rateLimit.ts, cors.ts
+│  └─ data/generated/     # Timetable shards + model.json (checked in, gitignored source CSVs)
+├─ ml/                    # train.py, retrain.py, MODEL_CARD.md, requirements.txt
+├─ scripts/               # ingest.mjs, harvest.mjs, run-eval.mjs, bench.mjs, promote/rollback-model.mjs
+├─ eval/                  # report.json — synthetic vs real hold-outs
+├─ e2e/                   # Playwright: submission.spec.ts, surfaces.spec.ts, home.spec.ts
+├─ docs/                  # DEMO.md, TRACEABILITY.md, DATA_HANDLING.md, adr/
+└─ SIH_PLAN.md            # Problem-statement compliance plan (do not edit lightly)
+```
 
 ## Quick start
 
