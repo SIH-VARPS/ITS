@@ -1,0 +1,40 @@
+{
+  "success": true,
+  "data": {
+    "pnrNumber": "1234567890",
+    "train": {
+      "number": "12952",
+      "name": "MUMBAI RAJDHANI",
+      "source": { "code": "NDLS", "name": "New Delhi" },
+      "destination": { "code": "MMCT", "name": "Mumbai Central" },
+      "boardingPoint": { "code": "NDLS", "name": "New Delhi" },
+      "reservationUpto": { "code": "MMCT", "name": "Mumbai Central" }
+    },
+    "journey": {
+      "date": "2026-08-20",
+      "class": "3A",
+      "quota": "GN",
+      "bookingFare": "2145"
+    },
+    "charting": {
+      "isPrepared": false,
+      "status": "Chart Not Prepared",
+      "chartUrl": "https://www.irctc.co.in/online-charts/"
+    },
+    "passengers": [
+      {
+        "passengerNumber": 1,
+        "bookingStatus": "WL/14/GN",
+        "currentStatus": "CNF",
+        "coach": "B4",
+        "berthNumber": 58,
+        "berthCode": "LB",
+        "coachPosition": "12",
+        "isConfirmed": true,
+        "isRAC": false,
+        "isWaitlisted": false,
+        "isCancelled": false
+      }
+    ]
+  }
+}

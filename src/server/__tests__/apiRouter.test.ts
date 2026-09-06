@@ -89,6 +89,10 @@ describe("handleApiRequest", { timeout: 30_000 }, () => {
 
     const pnr = await getJson("/api/v1/pnr/1234567890");
     expect(pnr.body).toMatchObject({ success: true });
+
+    const sample = await getJson("/api/v1/pnr/8421950247");
+    expect(sample.status).toBe(200);
+    expect(sample.body).toMatchObject({ success: true, data: { pnr: "8421950247", source: "demo" } });
   });
 
   it("returns 404 for unknown API paths", async () => {

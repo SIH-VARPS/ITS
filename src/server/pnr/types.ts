@@ -1,3 +1,5 @@
+export type PnrSource = "railradar" | "demo";
+
 export type PnrStatus = {
   pnr: string;
   trainNumber: string;
@@ -24,4 +26,9 @@ export type PnrStatus = {
     nextStation: string;
     eta: string;
   };
+  source: PnrSource;
 };
+
+export type PnrLookupResult =
+  | { ok: true; data: PnrStatus }
+  | { ok: false; status: 400 | 404; message: string };

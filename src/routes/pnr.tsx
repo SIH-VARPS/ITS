@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Toaster } from "@/components/ui/sonner";
 import type { PnrStatus } from "@/server/services/railBackend";
+import { SAMPLE_PNRS } from "@/server/pnr/samplePnrs";
 import { useTranslation } from "@/lib/i18n";
 
 export const Route = createFileRoute("/pnr")({
@@ -32,8 +33,6 @@ export const Route = createFileRoute("/pnr")({
     ],
   }),
 });
-
-const SAMPLE_PNRS = ["8421950247", "4920194821", "6730192845", "9120485721"];
 
 function PnrStatusPage() {
   const { t } = useTranslation();
@@ -143,9 +142,16 @@ function PnrStatusPage() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-rail-live/15 px-3 py-1 text-xs font-semibold text-rail-live">
-                    <CheckCircle2 className="size-3.5" /> {result.chartStatus}
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    {result.source === "demo" ? (
+                      <span className="inline-flex items-center rounded-full border border-border bg-secondary px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {t("pnr.demoTicket")}
+                      </span>
+                    ) : null}
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-rail-live/15 px-3 py-1 text-xs font-semibold text-rail-live">
+                      <CheckCircle2 className="size-3.5" /> {result.chartStatus}
+                    </span>
+                  </div>
                   <p className="mt-1 text-xs text-muted-foreground">PNR: {result.pnr}</p>
                 </div>
               </div>

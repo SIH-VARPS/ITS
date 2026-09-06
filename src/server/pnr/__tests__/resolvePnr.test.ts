@@ -2,13 +2,12 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mapRailradarPnr, resolvePnrStatus } from "../resolvePnr";
+import { lookupPnr, mapRailradarPnr, resolvePnrStatus } from "../resolvePnr";
 
-const fixture = JSON.parse(
-  readFileSync(
-    join(dirname(fileURLToPath(import.meta.url)), "../__fixtures__/pnr-success.json"),
-    "utf8",
-  ),
+const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), "../__fixtures__");
+const fixture = JSON.parse(readFileSync(join(fixturesDir, "pnr-success.json"), "utf8")) as unknown;
+const nestedFixture = JSON.parse(
+  readFileSync(join(fixturesDir, "pnr-nested.json"), "utf8"),
 ) as unknown;
 
 describe("PNR resolver", () => {
@@ -28,6 +27,26 @@ describe("PNR resolver", () => {
     expect(mapped?.trainNumber).toBe("12001");
     expect(mapped?.fromStation.code).toBe("HBJ");
     expect(mapped?.passengers[0]?.coach).toBe("B1");
+    expect(mapped?.source).toBe("railradar");
+  });
+
+  it("maps the current nested RailRadar PNR contract", () => {
+    const mapped = mapRailradarPnr("1234567890", nestedFixture);
+    expect(mapped?.trainNumber).toBe("12952");
+    expect(mapped?.trainName).toBe("MUMBAI RAJDHANI");
+    expect(mapped?.fromStation.code).toBe("NDLS");
+    expect(mapped?.toStation.code).toBe("MMCT");
+    expect(mapped?.bookingClass).toBe("3A");
+    expect(mapped?.quota).toBe("GN");
+    expect(mapped?.fare).toBe(2145);
+    expect(mapped?.chartStatus).toBe("CHART NOT PREPARED");
+    expect(mapped?.passengers[0]).toMatchObject({
+      number: 1,
+      coach: "B4",
+      berth: 58,
+      berthType: "Lower",
+      currentStatus: "CNF",
+    });
   });
 
   it("uses the live mapper when a fetch implementation is provided", async () => {
@@ -79,6 +98,39 @@ describe("PNR resolver", () => {
         fetchImpl: async () => new Response("{}", { status: 500 }),
       }),
     ).resolves.toBeNull();
+  });
+
+  it("returns 404 with the vendor message when a live PNR is missing and demo is off", async () => {
+    const result = await lookupPnr("1234567890", {
+      apiKey: "test-key",
+      skipNetwork: false,
+      demo: false,
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: { code: "PRS:PNR_FLUSHED", message: "This PNR record has been flushed." },
+          }),
+          { status: 404 },
+        ),
+    });
+    expect(result).toEqual({
+      ok: false,
+      status: 404,
+      message: "This PNR record has been flushed.",
+    });
+  });
+
+  it("falls back to a demo ticket for sample PNRs when live lookup fails", async () => {
+    const pnr = await resolvePnrStatus("8421950247", {
+      apiKey: "test-key",
+      skipNetwork: false,
+      demo: false,
+      fetchImpl: async () => new Response("{}", { status: 404 }),
+    });
+    expect(pnr?.pnr).toBe("8421950247");
+    expect(pnr?.source).toBe("demo");
+    expect(pnr?.passengers.length).toBeGreaterThan(0);
   });
 
   it("maps missing or unusable payloads to null", () => {

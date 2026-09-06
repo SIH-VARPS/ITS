@@ -291,13 +291,13 @@ export async function handleApiRequest(request: Request): Promise<Response | nul
     const pnrMatch = pathname.match(/^\/api(?:\/v1)?\/pnr\/([^/]+)$/);
     if (pnrMatch) {
       const pnr = decodeURIComponent(pnrMatch[1]!);
-      const status = await RailBackendService.getPnrStatus(pnr);
-      if (!status) {
-        return errorResponse("Invalid PNR format. PNR must be a 10-digit numeric string.", 400);
+      const result = await RailBackendService.lookupPnr(pnr);
+      if (!result.ok) {
+        return errorResponse(result.message, result.status);
       }
       return jsonResponse({
         success: true,
-        data: status,
+        data: result.data,
       });
     }
 

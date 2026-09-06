@@ -1,8 +1,11 @@
 import { computeLiveStatus, fmtMinutes } from "../../lib/liveStatus";
 import { getAllTrains, getTrainByNumber } from "../trains/store.server";
-import type { PnrStatus } from "./types";
+import { isSamplePnr } from "./samplePnrs";
+import type { PnrLookupResult, PnrSource, PnrStatus } from "./types";
 
 const RAILRADAR_PNR = "https://api.railradar.in/v1/pnr";
+
+type BerthType = PnrStatus["passengers"][number]["berthType"];
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -20,6 +23,9 @@ function asNumber(value: unknown, fallback = 0): number {
 }
 
 function stationFrom(value: unknown, fallbackCode: string, fallbackName: string) {
+  if (typeof value === "string" && value.trim()) {
+    return { code: value.trim().toUpperCase(), name: fallbackName || value.trim() };
+  }
   const rec = asRecord(value);
   if (!rec) return { code: fallbackCode, name: fallbackName };
   return {
@@ -28,25 +34,33 @@ function stationFrom(value: unknown, fallbackCode: string, fallbackName: string)
   };
 }
 
-const BERTH_TYPES: PnrStatus["passengers"][number]["berthType"][] = [
-  "Lower",
-  "Middle",
-  "Upper",
-  "Side Lower",
-  "Side Upper",
-];
+const BERTH_TYPES: BerthType[] = ["Lower", "Middle", "Upper", "Side Lower", "Side Upper"];
+
+const BERTH_CODE_MAP: Record<string, BerthType> = {
+  LB: "Lower",
+  MB: "Middle",
+  UB: "Upper",
+  SL: "Side Lower",
+  SU: "Side Upper",
+  WS: "Window",
+  AS: "Aisle",
+};
+
+function mapBerthType(raw: string, berth: number): BerthType {
+  if ((BERTH_TYPES as string[]).includes(raw)) return raw as BerthType;
+  const coded = BERTH_CODE_MAP[raw.toUpperCase()];
+  if (coded) return coded;
+  return BERTH_TYPES[berth % BERTH_TYPES.length]!;
+}
 
 function mapPassenger(raw: unknown, index: number): PnrStatus["passengers"][number] {
   const rec = asRecord(raw) ?? {};
   const coach = asString(rec["coach"], "S1");
-  const berth = asNumber(rec["berth"] ?? rec["berthNo"], index + 1);
-  const berthTypeRaw = asString(rec["berthType"]);
-  const berthType = (BERTH_TYPES as string[]).includes(berthTypeRaw)
-    ? (berthTypeRaw as PnrStatus["passengers"][number]["berthType"])
-    : BERTH_TYPES[berth % BERTH_TYPES.length]!;
+  const berth = asNumber(rec["berth"] ?? rec["berthNo"] ?? rec["berthNumber"], index + 1);
+  const berthType = mapBerthType(asString(rec["berthType"] ?? rec["berthCode"]), berth);
   const bookingStatus = asString(rec["bookingStatus"], `CNF/${coach}/${berth}`);
   return {
-    number: asNumber(rec["number"], index + 1),
+    number: asNumber(rec["number"] ?? rec["passengerNumber"], index + 1),
     bookingStatus,
     currentStatus: asString(rec["currentStatus"], bookingStatus),
     coach,
@@ -55,57 +69,101 @@ function mapPassenger(raw: unknown, index: number): PnrStatus["passengers"][numb
   };
 }
 
+function readTrainNumber(data: Record<string, unknown>): string {
+  const flat = asString(data["trainNumber"] ?? data["trainNo"]);
+  if (flat) return flat;
+  const train = asRecord(data["train"]);
+  return train ? asString(train["number"] ?? train["trainNumber"] ?? train["trainNo"]) : "";
+}
+
+function formatJourneyDate(raw: string, fallback: string): string {
+  if (!raw) return fallback;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+  if (!iso) return raw;
+  const stamp = Date.parse(`${iso[1]}-${iso[2]}-${iso[3]}T00:00:00+05:30`);
+  if (!Number.isFinite(stamp)) return raw;
+  return new Date(stamp).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function chartIsPrepared(data: Record<string, unknown>): boolean {
+  const charting = asRecord(data["charting"]);
+  if (charting) {
+    if (typeof charting["isPrepared"] === "boolean") return charting["isPrepared"];
+    const status = asString(charting["status"]).toLowerCase();
+    return status.includes("prepared") && !status.includes("not");
+  }
+  return Boolean(data["chartPrepared"] ?? data["chartStatus"] === "CHART PREPARED");
+}
+
+function withSource(status: PnrStatus, source: PnrSource): PnrStatus {
+  return { ...status, source };
+}
+
 /** Map a RailRadar (or RailRadar-shaped) PNR payload onto `PnrStatus`. */
 export function mapRailradarPnr(pnr: string, body: unknown): PnrStatus | null {
   const root = asRecord(body);
   if (!root) return null;
   const data = asRecord(root["data"]) ?? root;
-  const trainNumber = asString(data["trainNumber"] ?? data["trainNo"]);
+  const trainNumber = readTrainNumber(data);
   if (!trainNumber) return null;
 
+  const nestedTrain = asRecord(data["train"]);
+  const journey = asRecord(data["journey"]);
   const train = getTrainByNumber(trainNumber);
   const origin = train?.halts[0];
   const dest = train?.halts[train.halts.length - 1];
   const now = new Date();
   const live = train ? computeLiveStatus(train, now) : null;
+  const defaultDate = now.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 
   const passengersRaw = data["passengers"];
   const passengers = Array.isArray(passengersRaw)
     ? passengersRaw.map((row, i) => mapPassenger(row, i))
     : [];
 
-  const chartPrepared = Boolean(data["chartPrepared"] ?? data["chartStatus"] === "CHART PREPARED");
-
   return {
     pnr,
     trainNumber,
-    trainName: asString(data["trainName"], train?.name ?? trainNumber),
+    trainName: asString(data["trainName"] ?? nestedTrain?.["name"], train?.name ?? trainNumber),
     fromStation: stationFrom(
-      data["sourceStation"] ?? data["fromStation"],
+      data["sourceStation"] ?? data["fromStation"] ?? nestedTrain?.["source"],
       origin?.code ?? "",
       origin?.name ?? "",
     ),
     toStation: stationFrom(
-      data["destinationStation"] ?? data["toStation"],
+      data["destinationStation"] ?? data["toStation"] ?? nestedTrain?.["destination"],
       dest?.code ?? "",
       dest?.name ?? "",
     ),
-    boardingStation: stationFrom(data["boardingStation"], origin?.code ?? "", origin?.name ?? ""),
-    journeyDate: asString(
-      data["dateOfJourney"] ?? data["journeyDate"],
-      now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+    boardingStation: stationFrom(
+      data["boardingStation"] ?? nestedTrain?.["boardingPoint"],
+      origin?.code ?? "",
+      origin?.name ?? "",
     ),
-    bookingClass: asString(data["class"] ?? data["bookingClass"], "SL"),
-    quota: asString(data["quota"], "GN"),
-    chartStatus: chartPrepared ? "CHART PREPARED" : "CHART NOT PREPARED",
+    journeyDate: formatJourneyDate(
+      asString(data["dateOfJourney"] ?? data["journeyDate"] ?? journey?.["date"]),
+      defaultDate,
+    ),
+    bookingClass: asString(data["class"] ?? data["bookingClass"] ?? journey?.["class"], "SL"),
+    quota: asString(data["quota"] ?? journey?.["quota"], "GN"),
+    chartStatus: chartIsPrepared(data) ? "CHART PREPARED" : "CHART NOT PREPARED",
     passengers,
-    fare: asNumber(data["fare"], 0),
+    fare: asNumber(data["fare"] ?? journey?.["bookingFare"] ?? journey?.["fare"], 0),
     liveStatus: {
       speed: live?.speed ?? 0,
       delay: live?.forecast?.delayMin ?? live?.delay ?? 0,
       nextStation: live?.nextHalt?.name ?? "",
       eta: live?.etaNext ?? (origin ? fmtMinutes(train!.startsAt) : "--:--"),
     },
+    source: "railradar",
   };
 }
 
@@ -171,13 +229,25 @@ export function syntheticPnrStatus(pnr: string): PnrStatus | null {
       nextStation: live.nextHalt?.name ?? dest.name,
       eta: live.etaNext,
     },
+    source: "demo",
   };
+}
+
+function vendorErrorMessage(body: unknown, status: number): string {
+  const root = asRecord(body);
+  const error = root ? asRecord(root["error"]) : null;
+  const message = error ? asString(error["message"]) : "";
+  if (message) return message;
+  if (status === 404) return "PNR record not found.";
+  if (status === 401) return "PNR lookup is unauthorized. Check the RailRadar key.";
+  if (status === 429) return "PNR lookup is rate-limited. Try again later.";
+  return `PNR lookup failed (${status}).`;
 }
 
 export async function fetchRailradarPnr(
   pnr: string,
   opts: { apiKey: string; fetchImpl: typeof fetch },
-): Promise<PnrStatus | null> {
+): Promise<{ mapped: PnrStatus | null; status: number; message: string }> {
   const url = `${RAILRADAR_PNR}/${encodeURIComponent(pnr)}`;
   const response = await opts.fetchImpl(url, {
     headers: {
@@ -185,22 +255,45 @@ export async function fetchRailradarPnr(
       Accept: "application/json",
     },
   });
-  if (!response.ok) return null;
-  const body: unknown = await response.json();
-  return mapRailradarPnr(pnr, body);
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
+  }
+  if (!response.ok) {
+    return { mapped: null, status: response.status, message: vendorErrorMessage(body, response.status) };
+  }
+  const mapped = mapRailradarPnr(pnr, body);
+  if (!mapped) {
+    return { mapped: null, status: 502, message: "PNR response could not be mapped." };
+  }
+  return { mapped, status: 200, message: "" };
 }
 
-export async function resolvePnrStatus(
+export type ResolvePnrOptions = {
+  apiKey?: string;
+  demo?: boolean;
+  fetchImpl?: typeof fetch;
+  skipNetwork?: boolean;
+};
+
+function allowDemoFallback(cleaned: string, demoMode: boolean): boolean {
+  return demoMode || isSamplePnr(cleaned);
+}
+
+export async function lookupPnr(
   pnr: string,
-  opts: {
-    apiKey?: string;
-    demo?: boolean;
-    fetchImpl?: typeof fetch;
-    skipNetwork?: boolean;
-  } = {},
-): Promise<PnrStatus | null> {
+  opts: ResolvePnrOptions = {},
+): Promise<PnrLookupResult> {
   const cleaned = pnr.replace(/\D/g, "");
-  if (cleaned.length !== 10) return null;
+  if (cleaned.length !== 10) {
+    return {
+      ok: false,
+      status: 400,
+      message: "Invalid PNR format. PNR must be a 10-digit numeric string.",
+    };
+  }
 
   const apiKey = (opts.apiKey ?? process.env["RAILRADAR_API_KEY"] ?? "").trim();
   const envDemo = process.env["DEMO_MODE"] === "1" || process.env["DEMO_MODE"] === "true";
@@ -211,12 +304,28 @@ export async function resolvePnrStatus(
   if (apiKey && !skipNetwork) {
     try {
       const live = await fetchRailradarPnr(cleaned, { apiKey, fetchImpl });
-      if (live) return live;
+      if (live.mapped) return { ok: true, data: live.mapped };
+      if (!allowDemoFallback(cleaned, demoMode)) {
+        return { ok: false, status: 404, message: live.message };
+      }
     } catch {
-      // fall through to demo when allowed
+      if (!allowDemoFallback(cleaned, demoMode)) {
+        return { ok: false, status: 404, message: "PNR lookup failed." };
+      }
     }
-    if (!demoMode) return null;
   }
 
-  return syntheticPnrStatus(cleaned);
+  const demo = syntheticPnrStatus(cleaned);
+  if (!demo) {
+    return { ok: false, status: 404, message: "PNR record not found." };
+  }
+  return { ok: true, data: withSource(demo, "demo") };
+}
+
+export async function resolvePnrStatus(
+  pnr: string,
+  opts: ResolvePnrOptions = {},
+): Promise<PnrStatus | null> {
+  const result = await lookupPnr(pnr, opts);
+  return result.ok ? result.data : null;
 }

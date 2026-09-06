@@ -4,8 +4,8 @@ import { stationMap, stationFor, type Station } from "../../data/generated/stati
 import type { TrainRoute } from "../../data/trainTypes";
 import { computeLiveStatus, fmtMinutes, materializeHaltForecast } from "../../lib/liveStatus";
 import { DELAY_REASONS, type DelayReason } from "../../lib/delayReasons";
-import { resolvePnrStatus } from "../pnr/resolvePnr";
-import type { PnrStatus } from "../pnr/types";
+import { lookupPnr, resolvePnrStatus } from "../pnr/resolvePnr";
+import type { PnrLookupResult, PnrStatus } from "../pnr/types";
 import { getTrainByNumber, getTrainsCallingAt, ROUTE_COUNT } from "../trains/store.server";
 
 export type { PnrStatus };
@@ -572,12 +572,19 @@ export class RailBackendService {
 
   /**
    * 10-digit PNR: live RailRadar when a key is present, otherwise DEMO_MODE
-   * synthetic fallback. Never throws on a missing key.
+   * or sample-PNR synthetic fallback. Never throws on a missing key.
    */
   static getPnrStatus(
     pnr: string,
     opts?: Parameters<typeof resolvePnrStatus>[1],
   ): Promise<PnrStatus | null> {
     return resolvePnrStatus(pnr, opts);
+  }
+
+  static lookupPnr(
+    pnr: string,
+    opts?: Parameters<typeof lookupPnr>[1],
+  ): Promise<PnrLookupResult> {
+    return lookupPnr(pnr, opts);
   }
 }

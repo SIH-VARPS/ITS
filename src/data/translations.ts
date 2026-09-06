@@ -119,6 +119,7 @@ export const translations = {
       invalidPnr: "Please enter a valid 10-digit numeric PNR number",
       pnrNotFound: "PNR record not found",
       pnrSuccess: "PNR {pnr} status fetched successfully",
+      demoTicket: "Demo sample",
     },
     station: {
       liveBoard: "Live board",
