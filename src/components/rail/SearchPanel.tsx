@@ -88,6 +88,57 @@ export function SearchPanel() {
 
   return (
     <div className="space-y-4">
+      {/* Live train status search */}
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+        <div className="flex items-center gap-2 border-b border-border bg-subtle-gradient px-4 py-3">
+          <Radar className="size-4 text-primary" />
+          <p className="text-sm font-semibold">{t("search.liveTrainStatus")}</p>
+        </div>
+        <div className="p-4">
+          <form
+            className="flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              track();
+            }}
+          >
+            <Input
+              value={train}
+              onChange={(e) => setTrain(e.target.value)}
+              placeholder={t("search.trainPlaceholder")}
+              className="h-11"
+            />
+            <Button
+              type="submit"
+              size="icon"
+              className="size-11 shrink-0 rounded-xl"
+              aria-label={t("search.trackTrain")}
+            >
+              <Search className="size-4" />
+            </Button>
+          </form>
+
+          {trainSuggestions.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {trainSuggestions.map((s) => (
+                <li key={s.number}>
+                  <Link
+                    to="/train/$number"
+                    params={{ number: s.number }}
+                    className="flex items-center justify-between rounded-lg px-2 py-2 text-sm transition-colors hover:bg-secondary/60"
+                  >
+                    <span>
+                      <span className="text-muted-foreground font-mono">{s.number}</span> {s.name}
+                    </span>
+                    <ChevronRight className="size-4 text-muted-foreground" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
       {/* Live map link banner */}
       <Link
         to="/network"
@@ -232,57 +283,6 @@ export function SearchPanel() {
                     <span>
                       <span className="font-semibold text-foreground">{r.name}</span>{" "}
                       <span className="font-mono text-xs text-muted-foreground">({r.number})</span>
-                    </span>
-                    <ChevronRight className="size-4 text-muted-foreground" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-
-      {/* Live train status search */}
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
-        <div className="flex items-center gap-2 border-b border-border bg-subtle-gradient px-4 py-3">
-          <Radar className="size-4 text-primary" />
-          <p className="text-sm font-semibold">{t("search.liveTrainStatus")}</p>
-        </div>
-        <div className="p-4">
-          <form
-            className="flex items-center gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              track();
-            }}
-          >
-            <Input
-              value={train}
-              onChange={(e) => setTrain(e.target.value)}
-              placeholder={t("search.trainPlaceholder")}
-              className="h-11"
-            />
-            <Button
-              type="submit"
-              size="icon"
-              className="size-11 shrink-0 rounded-xl"
-              aria-label={t("search.trackTrain")}
-            >
-              <Search className="size-4" />
-            </Button>
-          </form>
-
-          {trainSuggestions.length > 0 && (
-            <ul className="mt-2 space-y-1">
-              {trainSuggestions.map((s) => (
-                <li key={s.number}>
-                  <Link
-                    to="/train/$number"
-                    params={{ number: s.number }}
-                    className="flex items-center justify-between rounded-lg px-2 py-2 text-sm transition-colors hover:bg-secondary/60"
-                  >
-                    <span>
-                      <span className="text-muted-foreground font-mono">{s.number}</span> {s.name}
                     </span>
                     <ChevronRight className="size-4 text-muted-foreground" />
                   </Link>
