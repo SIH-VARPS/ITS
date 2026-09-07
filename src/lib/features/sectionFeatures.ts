@@ -3,6 +3,11 @@ import { historicalDelayAt } from "@/lib/etaModel";
 import type { TrainObservation } from "@/server/live/types";
 import { FEATURE_ORDER, featureVectorSchema, type FeatureVector } from "./schema";
 import { indianSeason, istMidnightUtcMs, istParts } from "./ist";
+import {
+  normalizeHaltWeather,
+  type WeatherLookupSource,
+  type WeatherSnapshot,
+} from "./weather";
 
 export const DOWNSTREAM_SECTION_WINDOW = 3;
 
@@ -37,11 +42,16 @@ export type RawRun = {
   runDate: string;
   startsAt: number;
   occupancyBySection?: number[];
-  weatherByHalt?: number[];
+  /** WMO codes or full snapshots. Prefer snapshots after archive join. */
+  weatherByHalt?: Array<number | WeatherSnapshot>;
+  /** How `weatherByHalt` was produced. Never mix archive values into synthetic rows. */
+  weatherProvenance?: "synthetic" | "open-meteo-archive" | "unavailable";
   /** Present on training JSONL rows; optional so fixtures stay valid. */
   provenance?: "synthetic" | "railradar";
   halts: RawHalt[];
 };
+
+export type { WeatherLookupSource, WeatherSnapshot };
 
 export type BuildSectionFeaturesInput = {
   train: TrainRoute;
@@ -52,6 +62,9 @@ export type BuildSectionFeaturesInput = {
   observations?: readonly TrainObservation[];
   occupancy?: readonly OccupancyFix[];
   weatherCode?: number;
+  precipitationMm?: number;
+  visibilityKm?: number;
+  windSpeedKmph?: number;
   sectionLookup?: (fromCode: string, toCode: string) => SectionStats | undefined;
 };
 
@@ -268,7 +281,12 @@ export function buildSectionFeatures(input: BuildSectionFeaturesInput): FeatureV
   const relevant = observationsUpTo(input.observations, haltIndex);
   const stats = resolveSectionStats(from, to, input.sectionLookup);
   const ist = istParts(at);
-  const weatherCode = Math.max(0, Math.round(finite(input.weatherCode ?? 0, 0)));
+  const weather = {
+    weatherCode: Math.max(0, Math.round(finite(input.weatherCode ?? 0, 0))),
+    precipitationMm: Math.max(0, finite(input.precipitationMm ?? 0, 0)),
+    visibilityKm: Math.max(0, finite(input.visibilityKm ?? 0, 0)),
+    windSpeedKmph: Math.max(0, finite(input.windSpeedKmph ?? 0, 0)),
+  };
 
   return stampVector({
     trainNo: train.number,
@@ -286,10 +304,14 @@ export function buildSectionFeatures(input: BuildSectionFeaturesInput): FeatureV
     remainingKm: Math.max(0, dest.km - from.km),
     remainingHalts: Math.max(0, train.halts.length - 1 - haltIndex),
     downstreamOccupancy: Math.max(0, downstreamOccupancy(train, haltIndex, input.occupancy ?? [])),
-    weatherCode,
+    ...weather,
     dwellOverrunMin: finite(dwellOverrunMin(train, haltIndex, relevant), 0),
     speedDeviationKmph: finite(speedDeviationKmph(train, haltIndex, relevant), 0),
   });
+}
+
+export function haltWeatherAt(run: RawRun, haltIndex: number): WeatherSnapshot {
+  return normalizeHaltWeather(run.weatherByHalt?.[haltIndex]);
 }
 
 /** Build a vector from a simulated / harvested raw run (training + skew tests). */
@@ -306,7 +328,7 @@ export function buildFeaturesFromRawRun(run: RawRun, haltIndex: number, at: Date
     lookback === 0 ? currentDelayMin : finite(run.halts[haltIndex - lookback]!.delayMin, 0);
   const ist = istParts(at);
   const occupancy = run.occupancyBySection?.[haltIndex] ?? 0;
-  const weatherCode = Math.max(0, Math.round(finite(run.weatherByHalt?.[haltIndex] ?? 0, 0)));
+  const weather = haltWeatherAt(run, haltIndex);
 
   return stampVector({
     trainNo: run.trainNo,
@@ -324,7 +346,10 @@ export function buildFeaturesFromRawRun(run: RawRun, haltIndex: number, at: Date
     remainingKm: Math.max(0, dest.km - from.km),
     remainingHalts: Math.max(0, run.halts.length - 1 - haltIndex),
     downstreamOccupancy: Math.max(0, occupancy),
-    weatherCode,
+    weatherCode: weather.weatherCode,
+    precipitationMm: weather.precipitationMm,
+    visibilityKm: weather.visibilityKm,
+    windSpeedKmph: weather.windSpeedKmph,
     dwellOverrunMin: 0,
     speedDeviationKmph: 0,
   });

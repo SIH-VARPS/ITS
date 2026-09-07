@@ -1,5 +1,7 @@
 import { SourceTierBadge } from "./SourceTierBadge";
+import { WeatherSummary } from "./WeatherSummary";
 import { etaBandBounds, formatIstClock } from "@/lib/etaBand";
+import { humanWeatherFeature } from "@/lib/features/weatherLabels";
 import type { EtaResponse } from "@/server/schemas/eta";
 
 export function EtaBand({ payload, stationName }: { payload: EtaResponse; stationName?: string }) {
@@ -24,11 +26,16 @@ export function FeatureAttributions({ features }: { features: EtaResponse["featu
   if (top.length === 0) return null;
   return (
     <ul className="mt-2 space-y-1 text-xs text-muted-foreground" data-testid="eta-attributions">
-      {top.map((row) => (
-        <li key={row.name}>
-          {row.name}: {row.value} {row.unit}
-        </li>
-      ))}
+      {top.map((row) => {
+        const weather = humanWeatherFeature(row.name, row.value);
+        return (
+          <li key={row.name}>
+            {weather
+              ? `${weather.label}: ${weather.text}`
+              : `${row.name}: ${row.value} ${row.unit}`}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -50,6 +57,7 @@ export function EngineEtaBlock({
       ) : (
         <EtaBand payload={payload} />
       )}
+      <WeatherSummary features={payload.features} stationName={stationName ?? payload.station} />
       <FeatureAttributions features={payload.features} />
     </div>
   );

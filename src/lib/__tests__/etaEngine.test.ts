@@ -75,6 +75,42 @@ describe("etaEngine", () => {
     expect(predicted.modelVersion).toBe(FALLBACK_MODEL_VERSION);
   });
 
+  it("changes the P50 when weather features change", () => {
+    const artifact = resolveArtifact();
+    expect(artifact).not.toBeNull();
+    const clear = buildSectionFeatures({
+      train,
+      haltIndex: 0,
+      at: now,
+      weatherCode: 0,
+      precipitationMm: 0,
+      visibilityKm: 12,
+      windSpeedKmph: 6,
+    });
+    const rain = buildSectionFeatures({
+      train,
+      haltIndex: 0,
+      at: now,
+      weatherCode: 61,
+      precipitationMm: 8,
+      visibilityKm: 3,
+      windSpeedKmph: 22,
+    });
+    const fog = buildSectionFeatures({
+      train,
+      haltIndex: 0,
+      at: now,
+      weatherCode: 45,
+      precipitationMm: 0,
+      visibilityKm: 0.3,
+      windSpeedKmph: 4,
+    });
+    const scores = [clear, rain, fog].map(
+      (vector) => scoreQuantiles(artifact!, orderedFeatureValues(vector)).p50Min,
+    );
+    expect(new Set(scores).size).toBeGreaterThan(1);
+  });
+
   it("serves artifact quantiles by default", () => {
     resetEtaEngineForTests();
     expect(resolveArtifact()?.version).not.toBe(FALLBACK_MODEL_VERSION);

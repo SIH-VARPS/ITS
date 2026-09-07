@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-FEATURE_VERSION = "1"
+FEATURE_VERSION = "2"
 FEATURE_ORDER = [
     "currentDelayMin",
     "delayTrendMin",
@@ -19,6 +19,9 @@ FEATURE_ORDER = [
     "remainingHalts",
     "downstreamOccupancy",
     "weatherCode",
+    "precipitationMm",
+    "visibilityKm",
+    "windSpeedKmph",
     "dwellOverrunMin",
     "speedDeviationKmph",
 ]
@@ -53,6 +56,32 @@ def origin_instant(run_date: str, starts_at: float, extra_min: float) -> datetim
     return midnight_utc + timedelta(minutes=starts_at + extra_min)
 
 
+def _finite(value: Any, fallback: float = 0.0) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return fallback
+    return number if number == number else fallback  # noqa: PLR0124  NaN check
+
+
+def halt_weather(run: dict[str, Any], halt_index: int) -> dict[str, float]:
+    weather = run.get("weatherByHalt") or []
+    raw = weather[halt_index] if halt_index < len(weather) else 0
+    if isinstance(raw, dict):
+        return {
+            "weatherCode": max(0, int(round(_finite(raw.get("weatherCode"), 0)))),
+            "precipitationMm": max(0.0, _finite(raw.get("precipitationMm"), 0)),
+            "visibilityKm": max(0.0, _finite(raw.get("visibilityKm"), 0)),
+            "windSpeedKmph": max(0.0, _finite(raw.get("windSpeedKmph"), 0)),
+        }
+    return {
+        "weatherCode": max(0, int(round(_finite(raw, 0)))),
+        "precipitationMm": 0.0,
+        "visibilityKm": 0.0,
+        "windSpeedKmph": 0.0,
+    }
+
+
 def build_features_from_raw_run(run: dict[str, Any], halt_index: int, at: datetime) -> dict[str, Any]:
     halts = run["halts"]
     frm = halts[halt_index]
@@ -63,9 +92,8 @@ def build_features_from_raw_run(run: dict[str, Any], halt_index: int, at: dateti
     earlier = current_delay if lookback == 0 else float(halts[halt_index - lookback].get("delayMin") or 0)
     ist = ist_parts(at)
     occupancy = (run.get("occupancyBySection") or [0] * len(halts))
-    weather = (run.get("weatherByHalt") or [0] * len(halts))
     occ = occupancy[halt_index] if halt_index < len(occupancy) else 0
-    wmo = weather[halt_index] if halt_index < len(weather) else 0
+    weather = halt_weather(run, halt_index)
     return {
         "trainNo": str(run["trainNo"]),
         "fromStationCode": str(frm["code"]),
@@ -82,7 +110,10 @@ def build_features_from_raw_run(run: dict[str, Any], halt_index: int, at: dateti
         "remainingKm": max(0.0, float(dest["km"]) - float(frm["km"])),
         "remainingHalts": max(0, len(halts) - 1 - halt_index),
         "downstreamOccupancy": max(0.0, float(occ or 0)),
-        "weatherCode": max(0, int(round(float(wmo or 0)))),
+        "weatherCode": weather["weatherCode"],
+        "precipitationMm": weather["precipitationMm"],
+        "visibilityKm": weather["visibilityKm"],
+        "windSpeedKmph": weather["windSpeedKmph"],
         "dwellOverrunMin": 0.0,
         "speedDeviationKmph": 0.0,
     }

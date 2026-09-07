@@ -2,12 +2,12 @@
   {
     "trainNo": "12001",
     "haltIndex": 0,
-    "at": "2026-01-05T15:00:00+05:30",
+    "at": "2026-01-05T15:04:16.027885+05:30",
     "vector": {
       "trainNo": "12001",
       "fromStationCode": "HBJ",
       "toStationCode": "BPL",
-      "currentDelayMin": 0.0,
+      "currentDelayMin": 4.267131422549158,
       "delayTrendMin": 0.0,
       "sectionMeanRunMin": 25.0,
       "sectionP80RunMin": 31.0,
@@ -20,6 +20,9 @@
       "remainingHalts": 9,
       "downstreamOccupancy": 0.0,
       "weatherCode": 0,
+      "precipitationMm": 0.0,
+      "visibilityKm": 14.360834178514779,
+      "windSpeedKmph": 6.3713141195476055,
       "dwellOverrunMin": 0.0,
       "speedDeviationKmph": 0.0
     }
@@ -27,12 +30,12 @@
   {
     "trainNo": "12001",
     "haltIndex": 0,
-    "at": "2026-01-06T15:01:38.507984+05:30",
+    "at": "2026-01-06T15:10:00+05:30",
     "vector": {
       "trainNo": "12001",
       "fromStationCode": "HBJ",
       "toStationCode": "BPL",
-      "currentDelayMin": 1.641799729145196,
+      "currentDelayMin": 10.0,
       "delayTrendMin": 0.0,
       "sectionMeanRunMin": 25.0,
       "sectionP80RunMin": 31.0,
@@ -45,6 +48,9 @@
       "remainingHalts": 9,
       "downstreamOccupancy": 0.0,
       "weatherCode": 45,
+      "precipitationMm": 0.0,
+      "visibilityKm": 0.3520806405693293,
+      "windSpeedKmph": 12.41438851878047,
       "dwellOverrunMin": 0.0,
       "speedDeviationKmph": 0.0
     }
@@ -52,12 +58,12 @@
   {
     "trainNo": "12001",
     "haltIndex": 0,
-    "at": "2026-01-07T15:01:58.659846+05:30",
+    "at": "2026-01-07T15:00:00+05:30",
     "vector": {
       "trainNo": "12001",
       "fromStationCode": "HBJ",
       "toStationCode": "BPL",
-      "currentDelayMin": 1.9776640931070424,
+      "currentDelayMin": 0.0,
       "delayTrendMin": 0.0,
       "sectionMeanRunMin": 25.0,
       "sectionP80RunMin": 31.0,
@@ -70,6 +76,9 @@
       "remainingHalts": 9,
       "downstreamOccupancy": 0.0,
       "weatherCode": 0,
+      "precipitationMm": 0.0,
+      "visibilityKm": 8.342937759123743,
+      "windSpeedKmph": 12.04571646079421,
       "dwellOverrunMin": 0.0,
       "speedDeviationKmph": 0.0
     }
@@ -77,12 +86,12 @@
   {
     "trainNo": "12001",
     "haltIndex": 0,
-    "at": "2026-01-08T15:03:06.943099+05:30",
+    "at": "2026-01-08T15:01:04.768540+05:30",
     "vector": {
       "trainNo": "12001",
       "fromStationCode": "HBJ",
       "toStationCode": "BPL",
-      "currentDelayMin": 3.115718311760104,
+      "currentDelayMin": 1.0794756608011975,
       "delayTrendMin": 0.0,
       "sectionMeanRunMin": 25.0,
       "sectionP80RunMin": 31.0,
@@ -95,6 +104,9 @@
       "remainingHalts": 9,
       "downstreamOccupancy": 0.0,
       "weatherCode": 0,
+      "precipitationMm": 0.0,
+      "visibilityKm": 19.54978873860091,
+      "windSpeedKmph": 19.73520142585039,
       "dwellOverrunMin": 0.0,
       "speedDeviationKmph": 0.0
     }

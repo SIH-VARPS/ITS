@@ -5,6 +5,7 @@ import { assertFeatureVersion, FEATURE_VERSION } from "../schema";
 import {
   buildFeaturesFromRawRun,
   buildSectionFeatures,
+  haltWeatherAt,
   occupancyFixesFromRoutes,
   orderedFeatureValues,
   rawRunAt,
@@ -129,7 +130,7 @@ describe("sectionFeatures", () => {
 
   it("throws on FEATURE_VERSION mismatch", () => {
     expect(() => assertFeatureVersion("0")).toThrow(/FEATURE_VERSION mismatch/);
-    expect(FEATURE_VERSION).toBe("1");
+    expect(FEATURE_VERSION).toBe("2");
     expect(() => assertFeatureVersion(FEATURE_VERSION)).not.toThrow();
   });
 
@@ -137,6 +138,34 @@ describe("sectionFeatures", () => {
     const first = buildSectionFeatures({ train, haltIndex: 0, at, weatherCode: 3 });
     const second = buildSectionFeatures({ train, haltIndex: 0, at, weatherCode: 3 });
     expect(JSON.stringify(first)).toBe(JSON.stringify(second));
+  });
+
+  it("reads weather snapshots from weatherByHalt objects and legacy codes", () => {
+    const run = {
+      ...skewRaw[0]!,
+      weatherByHalt: [
+        { weatherCode: 61, precipitationMm: 4, visibilityKm: 6, windSpeedKmph: 20 },
+        45,
+      ],
+    };
+    const vector = buildFeaturesFromRawRun(run, 0, rawRunAt(run, 0));
+    expect(vector.weatherCode).toBe(61);
+    expect(vector.precipitationMm).toBe(4);
+    expect(vector.visibilityKm).toBe(6);
+    expect(vector.windSpeedKmph).toBe(20);
+    expect(haltWeatherAt(run, 1).weatherCode).toBe(45);
+    const withExtras = buildSectionFeatures({
+      train,
+      haltIndex: 0,
+      at,
+      weatherCode: 61,
+      precipitationMm: 2.5,
+      visibilityKm: 1.2,
+      windSpeedKmph: 30,
+    });
+    expect(withExtras.precipitationMm).toBe(2.5);
+    expect(withExtras.visibilityKm).toBe(1.2);
+    expect(withExtras.windSpeedKmph).toBe(30);
   });
 
   it("matches Python-built features on shared raw fixtures", () => {

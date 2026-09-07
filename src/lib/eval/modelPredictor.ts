@@ -41,6 +41,9 @@ export function createEtaEnginePredictor(routes: Map<string, TrainRoute>): Predi
       new Date(sample.atMs),
       {
         weatherCode: sample.weatherCode,
+        precipitationMm: sample.features["precipitationMm"] ?? 0,
+        visibilityKm: sample.features["visibilityKm"] ?? 0,
+        windSpeedKmph: sample.features["windSpeedKmph"] ?? 0,
         occupancy: occupancyFor(sample, route),
         runDate: sample.runDate,
       },
