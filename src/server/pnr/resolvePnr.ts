@@ -1,7 +1,12 @@
+import { featuredRoutes } from "@/data/generated/featured";
+import type { TrainRoute } from "@/data/trainTypes";
 import { computeLiveStatus, fmtMinutes } from "../../lib/liveStatus";
-import { getAllTrains, getTrainByNumber } from "../trains/store.server";
+import { getTrainByNumber } from "../trains/store.server";
 import { isSamplePnr } from "./samplePnrs";
+import { syntheticPnrStatus } from "./syntheticPnr";
 import type { PnrLookupResult, PnrSource, PnrStatus } from "./types";
+
+export { syntheticPnrStatus } from "./syntheticPnr";
 
 const RAILRADAR_PNR = "https://api.railradar.in/v1/pnr";
 
@@ -113,7 +118,7 @@ export function mapRailradarPnr(pnr: string, body: unknown): PnrStatus | null {
 
   const nestedTrain = asRecord(data["train"]);
   const journey = asRecord(data["journey"]);
-  const train = getTrainByNumber(trainNumber);
+  const train = safeTrainByNumber(trainNumber);
   const origin = train?.halts[0];
   const dest = train?.halts[train.halts.length - 1];
   const now = new Date();
@@ -167,70 +172,14 @@ export function mapRailradarPnr(pnr: string, body: unknown): PnrStatus | null {
   };
 }
 
-export function syntheticPnrStatus(pnr: string): PnrStatus | null {
-  const cleaned = pnr.replace(/\D/g, "");
-  if (cleaned.length !== 10) return null;
-
-  let seed = 0;
-  for (let i = 0; i < cleaned.length; i++) {
-    seed = (seed * 31 + cleaned.charCodeAt(i)) % 100000;
+function safeTrainByNumber(number: string): TrainRoute | undefined {
+  const featured = featuredRoutes.find((route) => route.number === number);
+  if (featured) return featured;
+  try {
+    return getTrainByNumber(number);
+  } catch {
+    return undefined;
   }
-
-  const trains = getAllTrains();
-  if (trains.length === 0) return null;
-  const train = trains[seed % trains.length]!;
-  const origin = train.halts[0]!;
-  const dest = train.halts[train.halts.length - 1]!;
-  const now = new Date();
-  const live = computeLiveStatus(train, now);
-
-  const classes = ["1A", "2A", "3A", "SL", "CC", "EC"];
-  const bookingClass = classes[seed % classes.length]!;
-  const passengerCount = (seed % 3) + 1;
-  const coachPrefix =
-    bookingClass === "SL" ? "S" : bookingClass === "3A" ? "B" : bookingClass === "2A" ? "A" : "H";
-  const coachNum = (seed % 6) + 1;
-  const coach = `${coachPrefix}${coachNum}`;
-
-  const passengers: PnrStatus["passengers"] = [];
-  for (let i = 1; i <= passengerCount; i++) {
-    const berthNo = ((seed + i * 7) % 72) + 1;
-    const bType = BERTH_TYPES[berthNo % BERTH_TYPES.length]!;
-    passengers.push({
-      number: i,
-      bookingStatus: `CNF/${coach}/${berthNo}`,
-      currentStatus: `CNF/${coach}/${berthNo}`,
-      coach,
-      berth: berthNo,
-      berthType: bType,
-    });
-  }
-
-  return {
-    pnr: cleaned,
-    trainNumber: train.number,
-    trainName: train.name,
-    fromStation: { code: origin.code, name: origin.name },
-    toStation: { code: dest.code, name: dest.name },
-    boardingStation: { code: origin.code, name: origin.name },
-    journeyDate: now.toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }),
-    bookingClass,
-    quota: "GN",
-    chartStatus: seed % 3 === 0 ? "CHART NOT PREPARED" : "CHART PREPARED",
-    passengers,
-    fare: 500 + (seed % 40) * 50,
-    liveStatus: {
-      speed: live.speed,
-      delay: live.forecast?.delayMin ?? live.delay,
-      nextStation: live.nextHalt?.name ?? dest.name,
-      eta: live.etaNext,
-    },
-    source: "demo",
-  };
 }
 
 function vendorErrorMessage(body: unknown, status: number): string {
@@ -278,6 +227,13 @@ export type ResolvePnrOptions = {
   skipNetwork?: boolean;
 };
 
+function envAllowsDemoFallback(): boolean {
+  const raw = (process.env["DEMO_MODE"] ?? "").trim().toLowerCase();
+  // Unset defaults to on so a hosted RailRadar key cannot kill the sample chips.
+  if (raw === "") return true;
+  return raw === "1" || raw === "true";
+}
+
 function allowDemoFallback(cleaned: string, demoMode: boolean): boolean {
   return demoMode || isSamplePnr(cleaned);
 }
@@ -296,8 +252,7 @@ export async function lookupPnr(
   }
 
   const apiKey = (opts.apiKey ?? process.env["RAILRADAR_API_KEY"] ?? "").trim();
-  const envDemo = process.env["DEMO_MODE"] === "1" || process.env["DEMO_MODE"] === "true";
-  const demoMode = opts.demo ?? (envDemo || apiKey.length === 0);
+  const demoMode = opts.demo ?? (envAllowsDemoFallback() || apiKey.length === 0);
   const skipNetwork = opts.skipNetwork ?? process.env["VITEST"] === "true";
   const fetchImpl = opts.fetchImpl ?? globalThis.fetch;
 
@@ -315,7 +270,12 @@ export async function lookupPnr(
     }
   }
 
-  const demo = syntheticPnrStatus(cleaned);
+  let demo: PnrStatus | null = null;
+  try {
+    demo = syntheticPnrStatus(cleaned);
+  } catch {
+    demo = null;
+  }
   if (!demo) {
     return { ok: false, status: 404, message: "PNR record not found." };
   }

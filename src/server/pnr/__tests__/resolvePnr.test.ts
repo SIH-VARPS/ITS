@@ -121,6 +121,13 @@ describe("PNR resolver", () => {
     });
   });
 
+  it("builds a demo ticket from bundled featured routes", async () => {
+    const { featuredRoutes } = await import("@/data/generated/featured");
+    const pnr = await resolvePnrStatus("8421950247", { apiKey: "", skipNetwork: true });
+    expect(pnr?.source).toBe("demo");
+    expect(featuredRoutes.some((route) => route.number === pnr?.trainNumber)).toBe(true);
+  });
+
   it("falls back to a demo ticket for sample PNRs when live lookup fails", async () => {
     const pnr = await resolvePnrStatus("8421950247", {
       apiKey: "test-key",

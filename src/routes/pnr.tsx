@@ -16,8 +16,9 @@ import { SiteFooter } from "@/components/rail/Sections";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Toaster } from "@/components/ui/sonner";
-import type { PnrStatus } from "@/server/services/railBackend";
+import { fetchPnrClient } from "@/server/pnr/clientLookup";
 import { SAMPLE_PNRS } from "@/server/pnr/samplePnrs";
+import type { PnrStatus } from "@/server/pnr/types";
 import { useTranslation } from "@/lib/i18n";
 
 export const Route = createFileRoute("/pnr")({
@@ -42,23 +43,19 @@ function PnrStatusPage() {
 
   const fetchPnr = async (pnrToFetch: string) => {
     const cleaned = pnrToFetch.replace(/\D/g, "");
-    if (cleaned.length !== 10) {
-      toast.error(t("pnr.invalidPnr"));
-      return;
-    }
     setLoading(true);
     try {
-      const res = await fetch(`/api/v1/pnr/${cleaned}`);
-      const data = await res.json();
-      if (data.error || !data.data) {
-        toast.error(data.message || t("pnr.pnrNotFound"));
+      const lookup = await fetchPnrClient(pnrToFetch);
+      if (!lookup.ok) {
+        toast.error(lookup.reason === "invalid" ? t("pnr.invalidPnr") : t("pnr.pnrNotFound"));
         setResult(null);
-      } else {
-        setResult(data.data);
-        toast.success(t("pnr.pnrSuccess", { pnr: cleaned }));
+        return;
       }
+      setResult(lookup.data);
+      toast.success(t("pnr.pnrSuccess", { pnr: cleaned }));
     } catch {
       toast.error(t("pnr.pnrNotFound"));
+      setResult(null);
     } finally {
       setLoading(false);
     }
