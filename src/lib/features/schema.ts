@@ -4,7 +4,7 @@ import { z } from "zod";
  * Feature schema version. A model artifact whose `featureVersion` does not
  * equal this constant must be rejected at load time.
  */
-export const FEATURE_VERSION = "1";
+export const FEATURE_VERSION = "2";
 
 /** Throw when a model artifact or vector stamp does not match this schema. */
 export function assertFeatureVersion(version: string): void {
@@ -40,6 +40,12 @@ export const featureVectorSchema = z.object({
   downstreamOccupancy: z.number().finite().nonnegative(),
   /** Open-Meteo WMO weather code at the next halt. */
   weatherCode: z.number().int().nonnegative(),
+  /** Hourly precipitation at the next halt, millimetres. */
+  precipitationMm: z.number().finite().nonnegative(),
+  /** Horizontal visibility at the next halt, kilometres. */
+  visibilityKm: z.number().finite().nonnegative(),
+  /** 10 m wind speed at the next halt, km/h. */
+  windSpeedKmph: z.number().finite().nonnegative(),
   /** Observed dwell minus scheduled halt, minutes (unscheduled stoppage proxy). */
   dwellOverrunMin: z.number().finite(),
   /** Observed speed minus `speedToNextStationKmph` (TSR proxy). */
@@ -62,6 +68,9 @@ export const FEATURE_ORDER = [
   "remainingHalts",
   "downstreamOccupancy",
   "weatherCode",
+  "precipitationMm",
+  "visibilityKm",
+  "windSpeedKmph",
   "dwellOverrunMin",
   "speedDeviationKmph",
 ] as const satisfies ReadonlyArray<keyof FeatureVector>;

@@ -64,6 +64,9 @@ export type EtaEngineOptions = {
   observations?: readonly TrainObservation[];
   occupancy?: readonly OccupancyFix[];
   weatherCode?: number;
+  precipitationMm?: number;
+  visibilityKm?: number;
+  windSpeedKmph?: number;
   runDate?: string;
   source?: ObservationSource;
   /** When true, skip the (train, halt, featureHash) cache. */
@@ -182,6 +185,9 @@ function sectionFeaturesForScore(
       train.startsAt,
       train.type,
       options.weatherCode ?? 0,
+      options.precipitationMm ?? 0,
+      options.visibilityKm ?? 0,
+      options.windSpeedKmph ?? 0,
       Math.floor(now.getTime() / 60_000),
     ].join("|");
     const hit = featureTemplateCache.get(key);
@@ -190,7 +196,7 @@ function sectionFeaturesForScore(
       train,
       haltIndex,
       at: now,
-      ...(options.weatherCode !== undefined ? { weatherCode: options.weatherCode } : {}),
+      ...weatherOptions(options),
     });
     featureTemplateCache.set(key, built);
     return built;
@@ -201,8 +207,22 @@ function sectionFeaturesForScore(
     at: now,
     ...(observations ? { observations } : {}),
     ...(occupancy ? { occupancy } : {}),
-    ...(options.weatherCode !== undefined ? { weatherCode: options.weatherCode } : {}),
+    ...weatherOptions(options),
   });
+}
+
+function weatherOptions(options: EtaEngineOptions): {
+  weatherCode?: number;
+  precipitationMm?: number;
+  visibilityKm?: number;
+  windSpeedKmph?: number;
+} {
+  return {
+    ...(options.weatherCode !== undefined ? { weatherCode: options.weatherCode } : {}),
+    ...(options.precipitationMm !== undefined ? { precipitationMm: options.precipitationMm } : {}),
+    ...(options.visibilityKm !== undefined ? { visibilityKm: options.visibilityKm } : {}),
+    ...(options.windSpeedKmph !== undefined ? { windSpeedKmph: options.windSpeedKmph } : {}),
+  };
 }
 
 function scoreSection(
@@ -527,6 +547,9 @@ const FEATURE_UNITS: Record<string, string> = {
   remainingHalts: "halts",
   downstreamOccupancy: "trains",
   weatherCode: "wmo",
+  precipitationMm: "mm",
+  visibilityKm: "km",
+  windSpeedKmph: "km/h",
   dwellOverrunMin: "min",
   speedDeviationKmph: "km/h",
 };

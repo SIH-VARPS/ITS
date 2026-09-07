@@ -1,6 +1,7 @@
 import type { Halt, TrainRoute } from "@/data/trainTypes";
 import { persistenceDelayMin, recoveredDelayMin, recoveryAllowanceMin } from "@/lib/baseline";
 import { FEATURE_ORDER, type FeatureVector } from "@/lib/features/schema";
+import { haltWeatherAt } from "@/lib/features/sectionFeatures";
 import { buildFeaturesFromRawRun, rawRunAt, type RawRun } from "@/lib/features/sectionFeatures";
 import { istParts } from "@/lib/features/ist";
 
@@ -566,6 +567,9 @@ function fallbackFeatureVector(
     remainingHalts: last - haltIndex,
     downstreamOccupancy: run.occupancyBySection?.[haltIndex] ?? 0,
     weatherCode,
+    precipitationMm: 0,
+    visibilityKm: 0,
+    windSpeedKmph: 0,
     dwellOverrunMin: 0,
     speedDeviationKmph: 0,
   };
@@ -633,7 +637,7 @@ export function samplesFromRawRun(
     if (!current) continue;
     const at = rawRunAt(run, i);
     const hourOfDay = istParts(at).hour;
-    const weatherCode = Math.max(0, Math.round(run.weatherByHalt?.[i] ?? 0));
+    const weatherCode = haltWeatherAt(run, i).weatherCode;
     let featureDump: Record<string, number>;
     try {
       featureDump = numericFeatures(buildFeaturesFromRawRun(run, i, at));

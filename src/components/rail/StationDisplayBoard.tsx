@@ -1,6 +1,7 @@
 import { EtaConfidenceBadge } from "./EtaConfidenceBadge";
 import { SourceTierBadge } from "./SourceTierBadge";
 import { formatIstClock } from "@/lib/etaBand";
+import { describeWeather, weatherFromFeatures } from "@/lib/features/weatherLabels";
 import type { BoardEntry } from "@/server/schemas/board";
 import type { EtaResponse } from "@/server/schemas/eta";
 
@@ -85,6 +86,11 @@ export function StationDisplayBoard({
                     <span className="mt-1 block text-xl font-semibold text-white">
                       {row.trainName}
                     </span>
+                    {isSpotlight && spotlight && spotlight.features.length > 0 ? (
+                      <span className="mt-1 block text-lg font-bold tracking-wide text-white">
+                        {describeWeather(weatherFromFeatures(spotlight.features)).label.toUpperCase()}
+                      </span>
+                    ) : null}
                   </th>
                   <td className="py-5 pr-4 font-mono text-4xl font-black text-white sm:text-5xl">
                     {formatIstClock(etaIso)}

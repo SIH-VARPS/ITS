@@ -221,9 +221,32 @@ def fit_and_export(output_path: Path, version: str, *, write_parity: bool = True
 def main() -> int:
     artifact = fit_and_export(MODEL_PATH, "1.0.0", write_parity=True)
     metrics = artifact["metrics"]
+    weather_names = {"weatherCode", "precipitationMm", "visibilityKm", "windSpeedKmph"}
+    weather_idx = {name: i for i, name in enumerate(FEATURE_ORDER) if name in weather_names}
+    rows = load_rows()
+    nonzero = sum(
+        1
+        for row in rows
+        if row["vector"]["weatherCode"] > 0
+        or row["vector"]["precipitationMm"] > 0
+        or row["vector"]["visibilityKm"] > 0
+        or row["vector"]["windSpeedKmph"] > 0
+    )
+
+    def tree_uses_weather(node: dict) -> bool:
+        if node["kind"] == "leaf":
+            return False
+        if int(node["featureIndex"]) in weather_idx.values():
+            return True
+        return tree_uses_weather(node["left"]) or tree_uses_weather(node["right"])
+
+    weather_splits = any(
+        tree_uses_weather(tree) for trees in artifact["trees"].values() for tree in trees
+    )
     print(
         f"wrote {MODEL_PATH} rows={artifact['rowCount']} provenance={artifact['provenance']}"
         f" mae={metrics['maeMin']:.3f}"
+        f" weather_nonzero={nonzero}/{len(rows)} weather_splits={weather_splits}"
     )
     return 0
 

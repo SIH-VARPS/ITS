@@ -24,13 +24,16 @@ const sample: FeatureVector = {
   remainingHalts: 1,
   downstreamOccupancy: 2,
   weatherCode: 3,
+  precipitationMm: 1.2,
+  visibilityKm: 8,
+  windSpeedKmph: 14,
   dwellOverrunMin: 4,
   speedDeviationKmph: -8,
 };
 
 describe("feature schema", () => {
-  it('freezes FEATURE_VERSION at "1"', () => {
-    expect(FEATURE_VERSION).toBe("1");
+  it('freezes FEATURE_VERSION at "2"', () => {
+    expect(FEATURE_VERSION).toBe("2");
   });
 
   it("throws when FEATURE_VERSION does not match", () => {
@@ -49,6 +52,10 @@ describe("feature schema", () => {
 
   it("lists numeric features in a stable order", () => {
     expect(FEATURE_ORDER).toContain("currentDelayMin");
+    expect(FEATURE_ORDER).toContain("weatherCode");
+    expect(FEATURE_ORDER).toContain("precipitationMm");
+    expect(FEATURE_ORDER).toContain("visibilityKm");
+    expect(FEATURE_ORDER).toContain("windSpeedKmph");
     expect(FEATURE_ORDER.length).toBeGreaterThanOrEqual(10);
   });
 });

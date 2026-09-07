@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync } from 
 import path from "node:path";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { attachArchiveWeather, normalizeHaltWeather } from "./weather-archive.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT_DIR = join(ROOT, "ml", "data");
@@ -122,8 +123,7 @@ function addDays(isoDate, days) {
   return dt.toISOString().slice(0, 10);
 }
 
-function harvestRuns(graph, trainsByNumber) {
-  const harvestRoot = join(ROOT, "data/harvest");
+export function harvestRuns(graph, trainsByNumber, harvestRoot = join(ROOT, "data/harvest")) {
   if (!existsSync(harvestRoot)) return [];
   /** @type {object[]} */
   const runs = [];
@@ -171,7 +171,12 @@ function harvestRuns(graph, trainsByNumber) {
             delays,
             graph,
             train.halts.map(() => 0),
-            train.halts.map(() => 0),
+            train.halts.map(() => ({
+              weatherCode: 0,
+              precipitationMm: 0,
+              visibilityKm: 0,
+              windSpeedKmph: 0,
+            })),
           ),
         );
       } catch {
@@ -179,7 +184,36 @@ function harvestRuns(graph, trainsByNumber) {
       }
     }
   }
-  return runs.map((run) => ({ ...run, provenance: "railradar" }));
+  return runs.map((run) => ({
+    ...run,
+    provenance: "railradar",
+    weatherProvenance: "unavailable",
+  }));
+}
+
+export function syntheticWeatherAt(month, rng) {
+  let weatherCode = 0;
+  if (month >= 6 && month <= 9) weatherCode = rng() < 0.45 ? 61 : 0;
+  else if (month === 12 || month <= 2) weatherCode = rng() < 0.2 ? 45 : 0;
+  else weatherCode = rng() < 0.08 ? 61 : 0;
+  return {
+    weatherCode,
+    precipitationMm: weatherCode === 61 ? 1 + rng() * 8 : 0,
+    visibilityKm: weatherCode === 45 ? 0.2 + rng() * 0.8 : 8 + rng() * 12,
+    windSpeedKmph: 4 + rng() * 16,
+  };
+}
+
+/** Tie synthetic delay to weather so quantile trees can split on it. Harvest delays stay as observed. */
+export function applyWeatherDelayBump(delays, weatherByHalt) {
+  return delays.map((delay, i) => {
+    const weather = normalizeHaltWeather(weatherByHalt[i]);
+    let extra = 0;
+    if (weather.weatherCode === 45) extra = 10;
+    else if (weather.weatherCode === 61) extra = 6;
+    else if (weather.precipitationMm >= 2) extra = 3;
+    return Math.max(0, delay + extra);
+  });
 }
 
 export function generateRawRuns(options = {}) {
@@ -198,31 +232,32 @@ export function generateRawRuns(options = {}) {
     if (!train.halts || train.halts.length < 3) continue;
     const stationMeans = priors[train.number] ?? {};
     for (let r = 0; r < runsPerTrain; r++) {
-      const delays = simulateAr1Delays(train.halts, stationMeans, rng);
       const occupancyBySection = train.halts.map(() =>
         rng() < 0.15 ? 1 + Math.floor(rng() * 3) : 0,
       );
-      const weatherByHalt = train.halts.map((_, i) => {
-        const month = ((r + i) % 12) + 1;
-        if (month >= 6 && month <= 9) return rng() < 0.45 ? 61 : 0;
-        if (month === 12 || month <= 2) return rng() < 0.2 ? 45 : 0;
-        return rng() < 0.08 ? 61 : 0;
-      });
+      const weatherByHalt = train.halts.map((_, i) => syntheticWeatherAt(((r + i) % 12) + 1, rng));
+      const delays = applyWeatherDelayBump(
+        simulateAr1Delays(train.halts, stationMeans, rng),
+        weatherByHalt,
+      );
       const runDate = addDays(originDate, r % 90);
       runs.push({
         ...toRawRun(train, runDate, delays, graph, occupancyBySection, weatherByHalt),
         provenance: "synthetic",
+        weatherProvenance: "synthetic",
       });
     }
   }
 
-  runs.push(...harvestRuns(graph, trainsByNumber));
+  const harvestRoot = options.harvestRoot ?? join(ROOT, "data/harvest");
+  runs.push(...harvestRuns(graph, trainsByNumber, harvestRoot));
   return { runs, priors, featured };
 }
 
-export function writeTrainingCorpus() {
+export async function writeTrainingCorpus(options = {}) {
   mkdirSync(OUT_DIR, { recursive: true });
-  const { runs } = generateRawRuns();
+  const { runs } = generateRawRuns(options);
+  await attachArchiveWeather(runs, options);
   const outPath = join(OUT_DIR, "raw-runs.jsonl");
   writeFileSync(outPath, runs.map((run) => JSON.stringify(run)).join("\n") + "\n", "utf8");
   const skew = runs.filter((run) => run.trainNo === "12951" || run.trainNo === "12001").slice(0, 4);
@@ -236,11 +271,20 @@ export function writeTrainingCorpus() {
     outPath,
     count: runs.length,
     real: runs.filter((r) => r.provenance === "railradar").length,
+    archived: runs.filter((r) => r.weatherProvenance === "open-meteo-archive").length,
   };
 }
 
 const thisFile = fileURLToPath(import.meta.url);
 if (process.argv[1] && path.normalize(thisFile) === path.normalize(path.resolve(process.argv[1]))) {
-  const result = writeTrainingCorpus();
-  console.log(`wrote ${result.count} runs (${result.real} real) → ${result.outPath}`);
+  writeTrainingCorpus()
+    .then((result) => {
+      console.log(
+        `wrote ${result.count} runs (${result.real} real, ${result.archived} archive-weather) → ${result.outPath}`,
+      );
+    })
+    .catch((error) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    });
 }

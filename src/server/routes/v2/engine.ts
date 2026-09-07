@@ -15,6 +15,9 @@ export type V2EngineContext = {
   observations: TrainObservation[];
   occupancy: ReturnType<typeof occupancyFixesFromRoutes>;
   weatherCode: number;
+  precipitationMm: number;
+  visibilityKm: number;
+  windSpeedKmph: number;
   source: ObservationSource;
   options: EtaEngineOptions;
 };
@@ -55,7 +58,7 @@ export async function loadEngineContext(
   const now = bucketNow();
   const live = inferLiveState(train, now, observations);
   const nextHalt = train.halts[Math.min(live.lastHaltIndex + 1, train.halts.length - 1)]!;
-  const weatherCode = await getWeatherClient().weatherCodeAt(
+  const weather = await getWeatherClient().weatherSnapshotAt(
     nextHalt.code,
     nextHalt.lat,
     nextHalt.lng,
@@ -64,9 +67,24 @@ export async function loadEngineContext(
   const options: EtaEngineOptions = {
     observations,
     occupancy,
-    weatherCode,
+    weatherCode: weather.weatherCode,
+    precipitationMm: weather.precipitationMm,
+    visibilityKm: weather.visibilityKm,
+    windSpeedKmph: weather.windSpeedKmph,
     source,
     ...(observations[0]?.runDate ? { runDate: observations[0].runDate } : {}),
   };
-  return { train, now, live, observations, occupancy, weatherCode, source, options };
+  return {
+    train,
+    now,
+    live,
+    observations,
+    occupancy,
+    weatherCode: weather.weatherCode,
+    precipitationMm: weather.precipitationMm,
+    visibilityKm: weather.visibilityKm,
+    windSpeedKmph: weather.windSpeedKmph,
+    source,
+    options,
+  };
 }

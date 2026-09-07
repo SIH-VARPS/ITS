@@ -23,7 +23,12 @@ const spotlight: EtaResponse = {
   improvementMin: 1,
   confidence: 0.8,
   reason: "congestion",
-  features: [],
+  features: [
+    { name: "weatherCode", value: 0, unit: "wmo" },
+    { name: "precipitationMm", value: 0, unit: "mm" },
+    { name: "visibilityKm", value: 10, unit: "km" },
+    { name: "windSpeedKmph", value: 5, unit: "km/h" },
+  ],
   modelVersion: "1.0.0",
   updatedAt: 1,
 };
@@ -39,6 +44,7 @@ describe("StationDisplayBoard", () => {
       />,
     );
     expect(screen.getByTestId("station-display").textContent).toContain("12951");
+    expect(screen.getByTestId("station-display").textContent).toContain("SKY CLEAR");
     expect(
       screen
         .getByTestId("station-display")

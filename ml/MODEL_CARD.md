@@ -41,8 +41,9 @@ actuals from halts _> i_.
 
 Numeric columns (`FEATURE_ORDER`): current delay, 3-halt delay trend, section
 mean / p80 run time, IST hour / weekday / season / day-of-journey, remaining
-km and halts, downstream occupancy, Open-Meteo WMO code, dwell overrun, speed
-deviation vs `speedToNextStationKmph`.
+km and halts, downstream occupancy, Open-Meteo WMO code, precipitation (mm),
+visibility (km), 10 m wind (km/h), dwell overrun, speed deviation vs
+`speedToNextStationKmph`.
 
 ## Model
 
@@ -64,7 +65,10 @@ sectional Δdelay target, P80 coverage ≈ 0.80.
 - Summing section quantiles overstates joint uncertainty; intervals widen with
   distance by design.
 - Diversions / cancelled trains are out of scope of the section graph.
-- Weather is Open-Meteo (not IMD station METAR) and is 0 in offline/CI mode.
+- Live weather is Open-Meteo forecast (not IMD station METAR) and is 0 in
+  offline/CI mode (`WEATHER_OFFLINE=1` / Vitest). Harvested training rows join
+  Open-Meteo Archive at each halt's lat/lng and observed time; synthetic rows
+  keep RNG weather marked `weatherProvenance: "synthetic"`.
 - Sparse real harvest: until quota accrues, most mass is synthetic. Priors are
   station _averages_, not per-run traces.
 - Train/serve skew is tested on shared raw-run fixtures; a feature change
